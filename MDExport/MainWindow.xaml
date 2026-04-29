@@ -1,0 +1,221 @@
+<Window x:Class="MDExport.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:local="clr-namespace:MDExport"
+        xmlns:avalonEdit="http://icsharpcode.net/sharpdevelop/avalonedit"
+        xmlns:wv2="clr-namespace:Microsoft.Web.WebView2.Wpf;assembly=Microsoft.Web.WebView2.Wpf"
+        Title="MDExport"
+        Width="1280"
+        Height="800"
+        MinWidth="640"
+        MinHeight="400"
+        WindowStartupLocation="CenterScreen"
+        Icon="/Assets/icon.png">
+
+    <Window.CommandBindings>
+        <CommandBinding Command="ApplicationCommands.New" Executed="NewCommand_Executed" />
+        <CommandBinding Command="ApplicationCommands.Open" Executed="OpenCommand_Executed" />
+        <CommandBinding Command="ApplicationCommands.Save" Executed="SaveCommand_Executed" />
+        <CommandBinding Command="ApplicationCommands.SaveAs" Executed="SaveAsCommand_Executed" />
+        <CommandBinding Command="ApplicationCommands.Close" Executed="CloseCommand_Executed" />
+        <CommandBinding Command="{x:Static local:MainWindow.InsertSnippetCommand}" Executed="InsertSnippet_Executed" />
+        <CommandBinding Command="ApplicationCommands.Help" Executed="ShowReference_Executed" />
+    </Window.CommandBindings>
+
+    <Window.InputBindings>
+        <!-- Headings -->
+        <KeyBinding Modifiers="Control" Key="D1" Command="{x:Static local:MainWindow.InsertSnippetCommand}" CommandParameter="h1" />
+        <KeyBinding Modifiers="Control" Key="D2" Command="{x:Static local:MainWindow.InsertSnippetCommand}" CommandParameter="h2" />
+        <KeyBinding Modifiers="Control" Key="D3" Command="{x:Static local:MainWindow.InsertSnippetCommand}" CommandParameter="h3" />
+        <KeyBinding Modifiers="Control" Key="D4" Command="{x:Static local:MainWindow.InsertSnippetCommand}" CommandParameter="h4" />
+        <KeyBinding Modifiers="Control" Key="D5" Command="{x:Static local:MainWindow.InsertSnippetCommand}" CommandParameter="h5" />
+        <KeyBinding Modifiers="Control" Key="D6" Command="{x:Static local:MainWindow.InsertSnippetCommand}" CommandParameter="h6" />
+        <!-- Inline -->
+        <KeyBinding Modifiers="Control" Key="B" Command="{x:Static local:MainWindow.InsertSnippetCommand}" CommandParameter="bold" />
+        <KeyBinding Modifiers="Control" Key="I" Command="{x:Static local:MainWindow.InsertSnippetCommand}" CommandParameter="italic" />
+        <KeyBinding Modifiers="Control" Key="K" Command="{x:Static local:MainWindow.InsertSnippetCommand}" CommandParameter="link" />
+        <KeyBinding Modifiers="Control" Key="Oem3" Command="{x:Static local:MainWindow.InsertSnippetCommand}" CommandParameter="code-inline" />
+        <!-- Blocks -->
+        <KeyBinding Modifiers="Control+Shift" Key="Oem3" Command="{x:Static local:MainWindow.InsertSnippetCommand}" CommandParameter="code-block" />
+        <KeyBinding Modifiers="Control" Key="Q" Command="{x:Static local:MainWindow.InsertSnippetCommand}" CommandParameter="blockquote" />
+        <KeyBinding Modifiers="Control" Key="OemQuestion" Command="{x:Static local:MainWindow.InsertSnippetCommand}" CommandParameter="comment" />
+        <!-- Lists -->
+        <KeyBinding Modifiers="Control" Key="L" Command="{x:Static local:MainWindow.InsertSnippetCommand}" CommandParameter="ul" />
+        <KeyBinding Modifiers="Control+Shift" Key="L" Command="{x:Static local:MainWindow.InsertSnippetCommand}" CommandParameter="ol" />
+        <!-- Table -->
+        <KeyBinding Modifiers="Control" Key="T" Command="{x:Static local:MainWindow.InsertSnippetCommand}" CommandParameter="table-pipe" />
+    </Window.InputBindings>
+
+    <DockPanel>
+
+        <!-- Ribbon / brand bar -->
+        <Border DockPanel.Dock="Top"
+                Background="{StaticResource SurfaceBrush}"
+                BorderBrush="{StaticResource BorderBrush}"
+                BorderThickness="0,0,0,1"
+                Padding="12,8">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <!-- Brand: icon + name -->
+                <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Image Source="/Assets/icon.png"
+                           Width="28" Height="28"
+                           Margin="0,0,10,0"
+                           RenderOptions.BitmapScalingMode="HighQuality" />
+                    <TextBlock Text="MDExport"
+                               VerticalAlignment="Center"
+                               FontSize="15"
+                               FontWeight="SemiBold"
+                               Foreground="{StaticResource TextBrush}" />
+                    <TextBlock Text="Markdown editor &amp; exporter"
+                               VerticalAlignment="Center"
+                               Margin="10,0,0,0"
+                               FontSize="11"
+                               Foreground="{StaticResource TextMutedBrush}" />
+                </StackPanel>
+
+                <!-- Action buttons -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Button Content="New"
+                            Style="{StaticResource RibbonButton}"
+                            Command="ApplicationCommands.New"
+                            ToolTip="New (Ctrl+N)" />
+                    <Button Content="Open"
+                            Style="{StaticResource RibbonButton}"
+                            Command="ApplicationCommands.Open"
+                            ToolTip="Open (Ctrl+O)" />
+                    <Button Content="Save"
+                            Style="{StaticResource RibbonButton}"
+                            Command="ApplicationCommands.Save"
+                            ToolTip="Save (Ctrl+S)" />
+                    <Border Width="1"
+                            Margin="8,5"
+                            Background="{StaticResource BorderBrush}" />
+                    <Button Content="Syntax"
+                            Style="{StaticResource RibbonButton}"
+                            Command="ApplicationCommands.Help"
+                            ToolTip="Markdown Syntax Reference (F1)" />
+                    <Border Width="1"
+                            Margin="8,5"
+                            Background="{StaticResource BorderBrush}" />
+                    <TextBlock Text="Export"
+                               VerticalAlignment="Center"
+                               Margin="4,0,6,0"
+                               FontSize="11"
+                               Foreground="{StaticResource TextMutedBrush}" />
+                    <Button Content="HTML"
+                            Style="{StaticResource RibbonExportButton}"
+                            Click="ExportHtml_Click"
+                            ToolTip="Export to HTML" />
+                    <Button Content="PDF"
+                            Style="{StaticResource RibbonExportButton}"
+                            Click="ExportPdf_Click"
+                            ToolTip="Export to PDF" />
+                    <Button Content="DOCX"
+                            Style="{StaticResource RibbonExportButton}"
+                            Click="ExportDocx_Click"
+                            ToolTip="Export to Word DOCX" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Menu -->
+        <Menu DockPanel.Dock="Top">
+            <MenuItem Header="_File">
+                <MenuItem Header="_New" Command="ApplicationCommands.New" InputGestureText="Ctrl+N" />
+                <MenuItem Header="_Open..." Command="ApplicationCommands.Open" InputGestureText="Ctrl+O" />
+                <Separator />
+                <MenuItem Header="_Save" Command="ApplicationCommands.Save" InputGestureText="Ctrl+S" />
+                <MenuItem Header="Save _As..." Command="ApplicationCommands.SaveAs" InputGestureText="Ctrl+Shift+S" />
+                <Separator />
+                <MenuItem Header="E_xit" Command="ApplicationCommands.Close" InputGestureText="Alt+F4" />
+            </MenuItem>
+            <MenuItem Header="_Edit">
+                <MenuItem Header="_Undo" Command="ApplicationCommands.Undo" InputGestureText="Ctrl+Z" />
+                <MenuItem Header="_Redo" Command="ApplicationCommands.Redo" InputGestureText="Ctrl+Y" />
+                <Separator />
+                <MenuItem Header="Cu_t" Command="ApplicationCommands.Cut" InputGestureText="Ctrl+X" />
+                <MenuItem Header="_Copy" Command="ApplicationCommands.Copy" InputGestureText="Ctrl+C" />
+                <MenuItem Header="_Paste" Command="ApplicationCommands.Paste" InputGestureText="Ctrl+V" />
+                <Separator />
+                <MenuItem Header="Select _All" Command="ApplicationCommands.SelectAll" InputGestureText="Ctrl+A" />
+            </MenuItem>
+            <MenuItem x:Name="InsertMenu" Header="_Insert" />
+            <MenuItem Header="E_xport">
+                <MenuItem Header="Export as _HTML..." Click="ExportHtml_Click" />
+                <MenuItem Header="Export as _PDF..." Click="ExportPdf_Click" />
+                <MenuItem Header="Export as _DOCX..." Click="ExportDocx_Click" />
+            </MenuItem>
+            <MenuItem Header="_View">
+                <MenuItem x:Name="MenuTogglePreview"
+                          Header="Toggle _Preview"
+                          IsCheckable="True"
+                          IsChecked="True"
+                          Click="TogglePreview_Click"
+                          InputGestureText="Ctrl+P" />
+                <MenuItem x:Name="MenuWordWrap"
+                          Header="Word _Wrap"
+                          IsCheckable="True"
+                          IsChecked="True"
+                          Click="ToggleWordWrap_Click" />
+            </MenuItem>
+            <MenuItem Header="_Reference">
+                <MenuItem Header="_Markdown Syntax..."
+                          Command="ApplicationCommands.Help"
+                          InputGestureText="F1" />
+                <Separator />
+                <MenuItem Header="_About..." Click="About_Click" />
+            </MenuItem>
+        </Menu>
+
+        <!-- Status Bar -->
+        <StatusBar DockPanel.Dock="Bottom">
+            <StatusBarItem>
+                <TextBlock x:Name="StatusFileText" Text="Untitled" />
+            </StatusBarItem>
+            <Separator Background="{StaticResource BorderBrush}" Width="1" Margin="6,2" />
+            <StatusBarItem>
+                <TextBlock x:Name="StatusModifiedText" Text="" Foreground="{StaticResource TextMutedBrush}" />
+            </StatusBarItem>
+            <StatusBarItem HorizontalAlignment="Right">
+                <TextBlock x:Name="StatusInfoText" Text="0 words   0 chars" />
+            </StatusBarItem>
+        </StatusBar>
+
+        <!-- Editor + Preview -->
+        <Grid>
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="EditorColumn" Width="*" MinWidth="120" />
+                <ColumnDefinition x:Name="SplitterColumn" Width="1" />
+                <ColumnDefinition x:Name="PreviewColumn" Width="*" MinWidth="120" />
+            </Grid.ColumnDefinitions>
+
+            <!-- Editor -->
+            <Border Grid.Column="0" Background="{StaticResource EditorBackgroundBrush}">
+                <avalonEdit:TextEditor x:Name="Editor"
+                                       Background="Transparent"
+                                       Foreground="{StaticResource TextBrush}"
+                                       FontFamily="{StaticResource EditorFontFamily}"
+                                       FontSize="14"
+                                       LineNumbersForeground="{StaticResource TextMutedBrush}"
+                                       ShowLineNumbers="True"
+                                       WordWrap="True"
+                                       Padding="8,6" />
+            </Border>
+
+            <GridSplitter Grid.Column="1" />
+
+            <!-- Preview -->
+            <Border Grid.Column="2" Background="White">
+                <wv2:WebView2 x:Name="Preview" />
+            </Border>
+        </Grid>
+
+    </DockPanel>
+
+</Window>

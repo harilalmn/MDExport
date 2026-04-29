@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+
+  <Package Name="MDExport"
+           Manufacturer="MDExport"
+           Version="1.0.0.0"
+           UpgradeCode="8C9D4A1F-2E7B-4A5D-BC32-7F6A8B9C0D1E"
+           Compressed="yes"
+           Scope="perMachine"
+           InstallerVersion="500">
+
+    <SummaryInformation Description="MDExport - Markdown Editor and Exporter"
+                        Manufacturer="MDExport" />
+
+    <MajorUpgrade DowngradeErrorMessage="A newer version of [ProductName] is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <Icon Id="MDExportIcon.exe" SourceFile="$(var.PublishDir)MDExport.exe" />
+    <Property Id="ARPPRODUCTICON" Value="MDExportIcon.exe" />
+    <Property Id="ARPHELPLINK" Value="https://github.com/" />
+    <Property Id="ARPNOREPAIR" Value="yes" Secure="yes" />
+
+    <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
+    <UIRef Id="WixUI_ErrorProgressText" />
+
+    <Feature Id="Main" Title="MDExport" Level="1" Display="expand"
+             Description="The MDExport application files.">
+      <!-- Auto-harvest the dotnet publish output -->
+      <Files Include="$(var.PublishDir)**" Directory="INSTALLFOLDER" />
+      <ComponentRef Id="ApplicationStartMenuShortcut" />
+    </Feature>
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="INSTALLFOLDER" Name="MDExport" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ApplicationProgramsFolder" Name="MDExport" />
+    </StandardDirectory>
+
+    <!-- Start Menu shortcut (per-user registry keypath for MSI compliance) -->
+    <DirectoryRef Id="ApplicationProgramsFolder">
+      <Component Id="ApplicationStartMenuShortcut" Guid="A4F6B12C-3DDC-4F30-9A7E-58E1D6F4C2A1">
+        <Shortcut Id="MDExportStartMenuShortcut"
+                  Name="MDExport"
+                  Description="Markdown editor and exporter"
+                  Target="[INSTALLFOLDER]MDExport.exe"
+                  WorkingDirectory="INSTALLFOLDER"
+                  Icon="MDExportIcon.exe" />
+        <RemoveFolder Id="RemoveApplicationProgramsFolder"
+                      Directory="ApplicationProgramsFolder"
+                      On="uninstall" />
+        <RegistryValue Root="HKCU"
+                       Key="Software\MDExport"
+                       Name="installed"
+                       Type="integer"
+                       Value="1"
+                       KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+  </Package>
+</Wix>

@@ -1,0 +1,11 @@
+bin/
+obj/
+*.user
+*.suo
+.vs/
+*.wixpdb
+*.wixobj
+*.msi
+publish/
+.idea/
+*.swp

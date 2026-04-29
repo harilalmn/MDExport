@@ -1,0 +1,16 @@
+<Project Sdk="WixToolset.Sdk/5.0.2">
+
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <OutputName>MDExport-1.0.0-x64</OutputName>
+    <Platforms>x64</Platforms>
+    <Platform>x64</Platform>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <DefineConstants>PublishDir=$(MSBuildThisFileDirectory)..\MDExport\bin\$(Configuration)\net8.0-windows\win-x64\publish\</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.UI.wixext" Version="5.0.2" />
+  </ItemGroup>
+
+</Project>
