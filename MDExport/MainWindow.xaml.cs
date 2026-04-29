@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -55,6 +56,7 @@ public partial class MainWindow : Window
         UpdateTitle();
         UpdateStatus();
         PopulateInsertMenu();
+        PopulateEditorContextMenu();
     }
 
     // --------------------- Snippet insertion ---------------------
@@ -62,6 +64,29 @@ public partial class MainWindow : Window
     private void PopulateInsertMenu()
     {
         InsertMenu.Items.Clear();
+        foreach (var category in BuildSnippetCategoryItems())
+            InsertMenu.Items.Add(category);
+    }
+
+    private void PopulateEditorContextMenu()
+    {
+        var menu = new ContextMenu();
+
+        menu.Items.Add(BuildCommandMenuItem("Cu_t", ApplicationCommands.Cut));
+        menu.Items.Add(BuildCommandMenuItem("_Copy", ApplicationCommands.Copy));
+        menu.Items.Add(BuildCommandMenuItem("_Paste", ApplicationCommands.Paste));
+        menu.Items.Add(new Separator());
+        menu.Items.Add(BuildCommandMenuItem("Select _All", ApplicationCommands.SelectAll));
+        menu.Items.Add(new Separator());
+
+        foreach (var category in BuildSnippetCategoryItems())
+            menu.Items.Add(category);
+
+        Editor.ContextMenu = menu;
+    }
+
+    private IEnumerable<MenuItem> BuildSnippetCategoryItems()
+    {
         foreach (var group in SnippetLibrary.All.GroupBy(s => s.Category))
         {
             var categoryItem = new MenuItem { Header = group.Key };
@@ -76,9 +101,17 @@ public partial class MainWindow : Window
                 item.Click += SnippetMenuItem_Click;
                 categoryItem.Items.Add(item);
             }
-            InsertMenu.Items.Add(categoryItem);
+            yield return categoryItem;
         }
     }
+
+    private MenuItem BuildCommandMenuItem(string header, RoutedUICommand command) =>
+        new()
+        {
+            Header = header,
+            Command = command,
+            CommandTarget = Editor.TextArea
+        };
 
     private void SnippetMenuItem_Click(object sender, RoutedEventArgs e)
     {
