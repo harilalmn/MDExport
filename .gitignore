@@ -7,5 +7,6 @@ obj/
 *.wixobj
 *.msi
 publish/
+Release/
 .idea/
 *.swp
