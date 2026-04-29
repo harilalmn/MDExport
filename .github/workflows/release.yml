@@ -1,0 +1,54 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag (e.g. v1.0.0)'
+        required: true
+
+env:
+  PUBLIC_RELEASES_REPO: harilalmn/MDExport-Releases
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Build MSI
+        shell: pwsh
+        run: ./build-release.ps1
+
+      - name: Resolve tag
+        id: tag
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF -like 'refs/tags/*') {
+            $t = $env:GITHUB_REF -replace '^refs/tags/',''
+          } else {
+            $t = '${{ github.event.inputs.tag }}'
+          }
+          "value=$t" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Tag: $t"
+
+      - name: Publish release to public repo
+        env:
+          GH_TOKEN: ${{ secrets.RELEASES_REPO_TOKEN }}
+        shell: pwsh
+        run: |
+          $tag = '${{ steps.tag.outputs.value }}'
+          $msi = Get-ChildItem -Path Release -Filter '*.msi' | Select-Object -First 1
+          if (-not $msi) { throw "No MSI found in Release/" }
+
+          gh release create $tag $msi.FullName `
+            --repo $env:PUBLIC_RELEASES_REPO `
+            --title "MDExport $tag" `
+            --notes "Download $($msi.Name) below to install MDExport $tag."
