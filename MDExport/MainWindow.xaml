@@ -183,7 +183,17 @@
                 <TextBlock x:Name="StatusModifiedText" Text="" Foreground="{StaticResource TextMutedBrush}" />
             </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
-                <TextBlock x:Name="StatusInfoText" Text="0 words   0 chars" />
+                <StackPanel Orientation="Horizontal">
+                    <TextBlock x:Name="UpdateAvailableText"
+                               Visibility="Collapsed"
+                               Margin="0,0,12,0"
+                               Cursor="Hand"
+                               TextDecorations="Underline"
+                               Foreground="{StaticResource AccentBrush}"
+                               MouseLeftButtonUp="UpdateAvailableText_Click"
+                               ToolTip="A new version of MDExport is available. Click to open the release page." />
+                    <TextBlock x:Name="StatusInfoText" Text="0 words   0 chars" />
+                </StackPanel>
             </StatusBarItem>
         </StatusBar>
 

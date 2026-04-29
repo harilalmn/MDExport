@@ -24,6 +24,7 @@ public partial class MainWindow : Window
     private bool _isModified;
     private bool _webViewReady;
     private string _lastRenderedHtml = string.Empty;
+    private string? _availableUpdateUrl;
 
     private const string DefaultMarkdown =
         "# Welcome to MDExport\n\n" +
@@ -137,6 +138,31 @@ public partial class MainWindow : Window
             MessageBox.Show(this, "Failed to initialize preview:\n" + ex.Message,
                 "MDExport", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
+
+        _ = CheckForUpdatesSilentlyAsync();
+    }
+
+    private async Task CheckForUpdatesSilentlyAsync()
+    {
+        try
+        {
+            var info = await Services.UpdateChecker.FetchLatestReleaseAsync();
+            if (!info.IsNewerThan(Services.UpdateChecker.GetCurrentVersion())) return;
+
+            _availableUpdateUrl = info.HtmlUrl;
+            UpdateAvailableText.Text = $"Update available: {info.TagName}";
+            UpdateAvailableText.Visibility = Visibility.Visible;
+        }
+        catch
+        {
+            // Silent: no network, rate-limited, etc. — user can still trigger from About.
+        }
+    }
+
+    private void UpdateAvailableText_Click(object sender, MouseButtonEventArgs e)
+    {
+        if (!string.IsNullOrEmpty(_availableUpdateUrl))
+            Services.UpdateChecker.OpenReleasePage(_availableUpdateUrl);
     }
 
     // --------------------- Editor / preview ---------------------
@@ -354,9 +380,8 @@ public partial class MainWindow : Window
 
     private void About_Click(object sender, RoutedEventArgs e)
     {
-        MessageBox.Show(this,
-            "MDExport 1.0\n\nA minimalist Markdown editor with HTML, PDF and DOCX export.\n\n© 2026",
-            "About MDExport", MessageBoxButton.OK, MessageBoxImage.Information);
+        var about = new AboutWindow { Owner = this };
+        about.ShowDialog();
     }
 
     private SyntaxReferenceWindow? _referenceWindow;
