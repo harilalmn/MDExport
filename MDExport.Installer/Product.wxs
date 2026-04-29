@@ -4,7 +4,7 @@
 
   <Package Name="MDExport"
            Manufacturer="MDExport"
-           Version="1.2.0.0"
+           Version="1.2.1.0"
            UpgradeCode="8C9D4A1F-2E7B-4A5D-BC32-7F6A8B9C0D1E"
            Compressed="yes"
            Scope="perMachine"
@@ -23,6 +23,7 @@
 
     <ui:WixUI Id="WixUI_InstallDir" InstallDirectory="INSTALLFOLDER" />
     <UIRef Id="WixUI_ErrorProgressText" />
+    <WixVariable Id="WixUILicenseRtf" Value="License.rtf" />
 
     <Feature Id="Main" Title="MDExport" Level="1" Display="expand"
              Description="The MDExport application files.">
