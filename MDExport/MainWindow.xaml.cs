@@ -40,7 +40,9 @@ public partial class MainWindow : Window
         "```\n\n" +
         "> Tip: use `Ctrl+S` to save and the **Export** menu for other formats.\n";
 
-    public MainWindow()
+    public MainWindow() : this(null) { }
+
+    public MainWindow(string? initialFilePath)
     {
         InitializeComponent();
 
@@ -51,7 +53,25 @@ public partial class MainWindow : Window
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
 
-        Editor.Text = DefaultMarkdown;
+        if (!string.IsNullOrEmpty(initialFilePath) && File.Exists(initialFilePath))
+        {
+            try
+            {
+                Editor.Text = File.ReadAllText(initialFilePath);
+                _currentFilePath = initialFilePath;
+            }
+            catch (Exception ex)
+            {
+                Editor.Text = DefaultMarkdown;
+                MessageBox.Show(this, "Failed to open file:\n" + ex.Message,
+                    "MDExport", MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        else
+        {
+            Editor.Text = DefaultMarkdown;
+        }
+
         _isModified = false;
         UpdateTitle();
         UpdateStatus();

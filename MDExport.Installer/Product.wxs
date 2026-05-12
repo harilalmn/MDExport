@@ -4,7 +4,7 @@
 
   <Package Name="MDExport"
            Manufacturer="MDExport"
-           Version="1.2.2.0"
+           Version="1.2.3.0"
            UpgradeCode="8C9D4A1F-2E7B-4A5D-BC32-7F6A8B9C0D1E"
            Compressed="yes"
            Scope="perMachine"
@@ -30,6 +30,7 @@
       <!-- Auto-harvest the dotnet publish output -->
       <Files Include="$(var.PublishDir)**" Directory="INSTALLFOLDER" />
       <ComponentRef Id="ApplicationStartMenuShortcut" />
+      <ComponentRef Id="FileAssociation_Markdown" />
     </Feature>
 
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -58,6 +59,42 @@
                        Type="integer"
                        Value="1"
                        KeyPath="yes" />
+      </Component>
+    </DirectoryRef>
+
+    <!-- File association: registers the MDExport.MarkdownFile ProgId, adds it
+         to the "Open with" list for .md/.markdown, and publishes Capabilities
+         so MDExport appears in Windows' Default Apps screen. The user must
+         still set it as default themselves. -->
+    <DirectoryRef Id="INSTALLFOLDER">
+      <Component Id="FileAssociation_Markdown" Guid="5E2A8B91-7C4D-4F1B-A6D3-9B8E2C7F4A1D">
+        <!-- ProgId definition -->
+        <RegistryValue Root="HKLM" Key="Software\Classes\MDExport.MarkdownFile"
+                       Type="string" Value="Markdown Document" KeyPath="yes" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\MDExport.MarkdownFile"
+                       Name="FriendlyTypeName" Type="string" Value="Markdown Document" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\MDExport.MarkdownFile\DefaultIcon"
+                       Type="string" Value="[INSTALLFOLDER]MDExport.exe,0" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\MDExport.MarkdownFile\shell\open\command"
+                       Type="string" Value="&quot;[INSTALLFOLDER]MDExport.exe&quot; &quot;%1&quot;" />
+
+        <!-- Advertise in the "Open with" submenu for these extensions -->
+        <RegistryValue Root="HKLM" Key="Software\Classes\.md\OpenWithProgids"
+                       Name="MDExport.MarkdownFile" Type="string" Value="" />
+        <RegistryValue Root="HKLM" Key="Software\Classes\.markdown\OpenWithProgids"
+                       Name="MDExport.MarkdownFile" Type="string" Value="" />
+
+        <!-- Application Capabilities for Windows "Default Apps" UI -->
+        <RegistryValue Root="HKLM" Key="Software\MDExport\Capabilities"
+                       Name="ApplicationName" Type="string" Value="MDExport" />
+        <RegistryValue Root="HKLM" Key="Software\MDExport\Capabilities"
+                       Name="ApplicationDescription" Type="string" Value="Markdown editor and exporter" />
+        <RegistryValue Root="HKLM" Key="Software\MDExport\Capabilities\FileAssociations"
+                       Name=".md" Type="string" Value="MDExport.MarkdownFile" />
+        <RegistryValue Root="HKLM" Key="Software\MDExport\Capabilities\FileAssociations"
+                       Name=".markdown" Type="string" Value="MDExport.MarkdownFile" />
+        <RegistryValue Root="HKLM" Key="Software\RegisteredApplications"
+                       Name="MDExport" Type="string" Value="Software\MDExport\Capabilities" />
       </Component>
     </DirectoryRef>
 
