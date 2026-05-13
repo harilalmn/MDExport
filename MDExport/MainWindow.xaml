@@ -152,6 +152,11 @@
                 <MenuItem Header="Export as _DOCX..." Click="ExportDocx_Click" />
             </MenuItem>
             <MenuItem Header="_View">
+                <MenuItem x:Name="MenuToggleEditor"
+                          Header="Show _Editor"
+                          IsCheckable="True"
+                          IsChecked="False"
+                          Click="ToggleEditor_Click" />
                 <MenuItem x:Name="MenuTogglePreview"
                           Header="Toggle _Preview"
                           IsCheckable="True"
@@ -200,8 +205,8 @@
         <!-- Editor + Preview -->
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition x:Name="EditorColumn" Width="*" MinWidth="120" />
-                <ColumnDefinition x:Name="SplitterColumn" Width="1" />
+                <ColumnDefinition x:Name="EditorColumn" Width="0" MinWidth="0" />
+                <ColumnDefinition x:Name="SplitterColumn" Width="0" />
                 <ColumnDefinition x:Name="PreviewColumn" Width="*" MinWidth="120" />
             </Grid.ColumnDefinitions>
 

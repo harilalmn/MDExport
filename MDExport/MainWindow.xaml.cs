@@ -407,23 +407,22 @@ public partial class MainWindow : Window
 
     // --------------------- View ---------------------
 
-    private void TogglePreview_Click(object sender, RoutedEventArgs e)
+    private void TogglePreview_Click(object sender, RoutedEventArgs e) => UpdatePaneLayout();
+
+    private void ToggleEditor_Click(object sender, RoutedEventArgs e) => UpdatePaneLayout();
+
+    private void UpdatePaneLayout()
     {
-        var visible = MenuTogglePreview.IsChecked;
-        if (visible)
-        {
-            EditorColumn.Width = new GridLength(1, GridUnitType.Star);
-            SplitterColumn.Width = new GridLength(1);
-            PreviewColumn.Width = new GridLength(1, GridUnitType.Star);
-            PreviewColumn.MinWidth = 120;
-        }
-        else
-        {
-            EditorColumn.Width = new GridLength(1, GridUnitType.Star);
-            SplitterColumn.Width = new GridLength(0);
-            PreviewColumn.MinWidth = 0;
-            PreviewColumn.Width = new GridLength(0);
-        }
+        var editor = MenuToggleEditor.IsChecked;
+        var preview = MenuTogglePreview.IsChecked;
+
+        EditorColumn.MinWidth = editor ? 120 : 0;
+        EditorColumn.Width = editor ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
+
+        SplitterColumn.Width = editor && preview ? new GridLength(1) : new GridLength(0);
+
+        PreviewColumn.MinWidth = preview ? 120 : 0;
+        PreviewColumn.Width = preview ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
     }
 
     private void ToggleWordWrap_Click(object sender, RoutedEventArgs e)
