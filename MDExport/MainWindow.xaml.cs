@@ -230,6 +230,17 @@ public partial class MainWindow : Window
             _availableUpdateUrl = info.HtmlUrl;
             UpdateAvailableText.Text = $"Update available: {info.TagName}";
             UpdateAvailableText.Visibility = Visibility.Visible;
+
+            var current = Services.UpdateChecker.GetCurrentVersion();
+            var result = MessageBox.Show(this,
+                $"A new version of MDExport is available.\n\n" +
+                $"Current version: {current}\n" +
+                $"Latest version:  {info.TagName}\n\n" +
+                $"Would you like to open the download page?",
+                "MDExport — Update available",
+                MessageBoxButton.YesNo, MessageBoxImage.Information);
+            if (result == MessageBoxResult.Yes && !string.IsNullOrEmpty(_availableUpdateUrl))
+                Services.UpdateChecker.OpenReleasePage(_availableUpdateUrl);
         }
         catch
         {
