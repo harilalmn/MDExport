@@ -1,7 +1,9 @@
 using System.IO;
-using System.Reflection;
 using System.Text;
 using Markdig;
+using Markdig.Renderers;
+using Markdig.Renderers.Html;
+using Markdig.Syntax;
 
 namespace MDExport.Services;
 
@@ -13,18 +15,56 @@ internal static class MarkdownRenderer
         .UseSoftlineBreakAsHardlineBreak()
         .Build();
 
+    private static readonly MarkdownPipeline PreviewPipeline = new MarkdownPipelineBuilder()
+        .UseAdvancedExtensions()
+        .UseEmojiAndSmiley()
+        .UseSoftlineBreakAsHardlineBreak()
+        .UsePreciseSourceLocation()
+        .Build();
+
     private static string? _templateCache;
 
     public static string RenderBodyHtml(string markdown)
         => Markdown.ToHtml(markdown ?? string.Empty, Pipeline);
 
+    public static string RenderBodyHtmlForPreview(string markdown)
+    {
+        var doc = Markdown.Parse(markdown ?? string.Empty, PreviewPipeline);
+        AnnotateBlocks(doc);
+        using var sw = new StringWriter();
+        var renderer = new HtmlRenderer(sw);
+        PreviewPipeline.Setup(renderer);
+        renderer.Render(doc);
+        sw.Flush();
+        return sw.ToString();
+    }
+
     public static string RenderFullPage(string markdown, string? title = null)
+    {
+        var body = RenderBodyHtmlForPreview(markdown);
+        var template = LoadTemplate();
+        return template
+            .Replace("{{TITLE}}", System.Net.WebUtility.HtmlEncode(title ?? "Preview"))
+            .Replace("{{CONTENT}}", body);
+    }
+
+    public static string RenderExportPage(string markdown, string? title = null)
     {
         var body = RenderBodyHtml(markdown);
         var template = LoadTemplate();
         return template
             .Replace("{{TITLE}}", System.Net.WebUtility.HtmlEncode(title ?? "Preview"))
             .Replace("{{CONTENT}}", body);
+    }
+
+    private static void AnnotateBlocks(MarkdownDocument doc)
+    {
+        foreach (var block in doc.Descendants<Block>())
+        {
+            if (block.Line < 0) continue;
+            var attrs = block.GetAttributes();
+            attrs.AddPropertyIfNotExist("data-source-line", (block.Line + 1).ToString());
+        }
     }
 
     private static string LoadTemplate()

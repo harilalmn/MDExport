@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
@@ -24,8 +25,17 @@ public partial class MainWindow : Window
     private string? _currentFilePath;
     private bool _isModified;
     private bool _webViewReady;
+    private bool _previewDocumentReady;
     private string _lastRenderedHtml = string.Empty;
     private string? _availableUpdateUrl;
+
+    private int _suppressEditorScrollEcho;
+    private int _suppressEditorSelectionEcho;
+    private int _lastSentEditorScrollLine = -1;
+    private int _lastEditorSelStart = -1;
+    private int _lastEditorSelEnd = -1;
+    private readonly DispatcherTimer _editorScrollDebounce;
+    private readonly DispatcherTimer _editorSelectionDebounce;
 
     private const string DefaultMarkdown =
         "# Welcome to MDExport\n\n" +
@@ -49,7 +59,15 @@ public partial class MainWindow : Window
         _previewTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _previewTimer.Tick += PreviewTimer_Tick;
 
+        _editorScrollDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(30) };
+        _editorScrollDebounce.Tick += EditorScrollDebounce_Tick;
+
+        _editorSelectionDebounce = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(120) };
+        _editorSelectionDebounce.Tick += EditorSelectionDebounce_Tick;
+
         Editor.TextChanged += Editor_TextChanged;
+        Editor.TextArea.TextView.ScrollOffsetChanged += EditorTextView_ScrollOffsetChanged;
+        Editor.TextArea.SelectionChanged += EditorTextArea_SelectionChanged;
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
 
@@ -92,6 +110,9 @@ public partial class MainWindow : Window
     {
         var menu = new ContextMenu();
 
+        menu.Items.Add(BuildCommandMenuItem("_Undo", ApplicationCommands.Undo));
+        menu.Items.Add(BuildCommandMenuItem("_Redo", ApplicationCommands.Redo));
+        menu.Items.Add(new Separator());
         menu.Items.Add(BuildCommandMenuItem("Cu_t", ApplicationCommands.Cut));
         menu.Items.Add(BuildCommandMenuItem("_Copy", ApplicationCommands.Copy));
         menu.Items.Add(BuildCommandMenuItem("_Paste", ApplicationCommands.Paste));
@@ -99,8 +120,10 @@ public partial class MainWindow : Window
         menu.Items.Add(BuildCommandMenuItem("Select _All", ApplicationCommands.SelectAll));
         menu.Items.Add(new Separator());
 
+        var insertHeader = new MenuItem { Header = "_Insert" };
         foreach (var category in BuildSnippetCategoryItems())
-            menu.Items.Add(category);
+            insertHeader.Items.Add(category);
+        menu.Items.Add(insertHeader);
 
         Editor.ContextMenu = menu;
     }
@@ -183,6 +206,8 @@ public partial class MainWindow : Window
             Preview.CoreWebView2.Settings.AreDevToolsEnabled = false;
             Preview.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
             Preview.CoreWebView2.Settings.IsStatusBarEnabled = false;
+            Preview.CoreWebView2.WebMessageReceived += Preview_WebMessageReceived;
+            Preview.CoreWebView2.NavigationCompleted += Preview_NavigationCompleted;
             _webViewReady = true;
             RenderPreviewNow();
         }
@@ -241,7 +266,153 @@ public partial class MainWindow : Window
         var html = MarkdownRenderer.RenderFullPage(Editor.Text, GetTitle());
         if (html == _lastRenderedHtml) return;
         _lastRenderedHtml = html;
+        _previewDocumentReady = false;
         Preview.CoreWebView2.NavigateToString(html);
+    }
+
+    // --------------------- Sync scroll / selection ---------------------
+
+    private void Preview_NavigationCompleted(object? sender, CoreWebView2NavigationCompletedEventArgs e)
+    {
+        _previewDocumentReady = true;
+        // Reset tracking so we force-send current state after re-render.
+        _lastSentEditorScrollLine = -1;
+        _lastEditorSelStart = -2;
+        _lastEditorSelEnd = -2;
+        PushEditorScrollToPreview();
+        PushEditorSelectionToPreview();
+    }
+
+    private void EditorTextView_ScrollOffsetChanged(object? sender, EventArgs e)
+    {
+        if (_suppressEditorScrollEcho > 0) { _suppressEditorScrollEcho--; return; }
+        _editorScrollDebounce.Stop();
+        _editorScrollDebounce.Start();
+    }
+
+    private void EditorScrollDebounce_Tick(object? sender, EventArgs e)
+    {
+        _editorScrollDebounce.Stop();
+        PushEditorScrollToPreview();
+    }
+
+    private void PushEditorScrollToPreview()
+    {
+        if (!_previewDocumentReady || Preview.CoreWebView2 == null) return;
+        var line = GetEditorTopVisibleLine();
+        if (line <= 0 || line == _lastSentEditorScrollLine) return;
+        _lastSentEditorScrollLine = line;
+        _ = Preview.CoreWebView2.ExecuteScriptAsync(
+            $"window.mdScrollToLine && window.mdScrollToLine({line});");
+    }
+
+    private int GetEditorTopVisibleLine()
+    {
+        var tv = Editor.TextArea.TextView;
+        if (tv.VisualLines.Count == 0) return 1;
+        var first = tv.VisualLines[0];
+        return first.FirstDocumentLine.LineNumber;
+    }
+
+    private void EditorTextArea_SelectionChanged(object? sender, EventArgs e)
+    {
+        if (_suppressEditorSelectionEcho > 0) { _suppressEditorSelectionEcho--; return; }
+        _editorSelectionDebounce.Stop();
+        _editorSelectionDebounce.Start();
+    }
+
+    private void EditorSelectionDebounce_Tick(object? sender, EventArgs e)
+    {
+        _editorSelectionDebounce.Stop();
+        PushEditorSelectionToPreview();
+    }
+
+    private void PushEditorSelectionToPreview()
+    {
+        if (!_previewDocumentReady || Preview.CoreWebView2 == null) return;
+        int startLine, endLine;
+        var sel = Editor.TextArea.Selection;
+        if (sel.IsEmpty)
+        {
+            startLine = endLine = -1;
+        }
+        else
+        {
+            startLine = Editor.Document.GetLineByOffset(sel.SurroundingSegment.Offset).LineNumber;
+            endLine = Editor.Document.GetLineByOffset(sel.SurroundingSegment.EndOffset).LineNumber;
+        }
+        if (startLine == _lastEditorSelStart && endLine == _lastEditorSelEnd) return;
+        _lastEditorSelStart = startLine;
+        _lastEditorSelEnd = endLine;
+        _ = Preview.CoreWebView2.ExecuteScriptAsync(
+            $"window.mdHighlightLines && window.mdHighlightLines({startLine}, {endLine});");
+    }
+
+    private void Preview_WebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
+    {
+        string payload;
+        try { payload = e.TryGetWebMessageAsString(); }
+        catch { return; }
+        if (string.IsNullOrEmpty(payload)) return;
+
+        try
+        {
+            using var doc = JsonDocument.Parse(payload);
+            var root = doc.RootElement;
+            if (!root.TryGetProperty("type", out var typeEl)) return;
+            var type = typeEl.GetString();
+
+            if (type == "scroll" && root.TryGetProperty("line", out var lineEl) && lineEl.TryGetInt32(out var line))
+            {
+                ScrollEditorToLine(line);
+            }
+            else if (type == "selection"
+                     && root.TryGetProperty("startLine", out var s) && s.TryGetInt32(out var sLine)
+                     && root.TryGetProperty("endLine", out var ep) && ep.TryGetInt32(out var eLine))
+            {
+                SelectEditorLines(sLine, eLine);
+            }
+        }
+        catch
+        {
+            // ignore malformed messages
+        }
+    }
+
+    private void ScrollEditorToLine(int line)
+    {
+        if (line < 1) return;
+        if (line > Editor.Document.LineCount) line = Editor.Document.LineCount;
+        if (GetEditorTopVisibleLine() == line) return;
+        _suppressEditorScrollEcho = 2;
+        Editor.ScrollToLine(line);
+    }
+
+    private void SelectEditorLines(int startLine, int endLine)
+    {
+        if (startLine < 1 || endLine < 1)
+        {
+            if (Editor.TextArea.Selection.IsEmpty) return;
+            _suppressEditorSelectionEcho = 2;
+            Editor.TextArea.ClearSelection();
+            return;
+        }
+        var doc = Editor.Document;
+        startLine = Math.Max(1, Math.Min(doc.LineCount, startLine));
+        endLine = Math.Max(1, Math.Min(doc.LineCount, endLine));
+        if (endLine < startLine) (startLine, endLine) = (endLine, startLine);
+        var startSeg = doc.GetLineByNumber(startLine);
+        var endSeg = doc.GetLineByNumber(endLine);
+        var startOffset = startSeg.Offset;
+        var endOffset = endSeg.EndOffset;
+
+        if (_lastEditorSelStart == startLine && _lastEditorSelEnd == endLine) return;
+
+        _suppressEditorSelectionEcho = 2;
+        _suppressEditorScrollEcho = 2;
+        _lastEditorSelStart = startLine;
+        _lastEditorSelEnd = endLine;
+        Editor.Select(startOffset, endOffset - startOffset);
     }
 
     // --------------------- File commands ---------------------

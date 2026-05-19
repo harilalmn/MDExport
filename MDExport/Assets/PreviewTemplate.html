@@ -12,6 +12,8 @@
     --code-bg: #f6f8fa;
     --link: #0969da;
     --quote-border: #d0d7de;
+    --sync-highlight: rgba(9, 105, 218, 0.10);
+    --sync-highlight-border: rgba(9, 105, 218, 0.45);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: var(--bg); }
@@ -80,8 +82,15 @@
   table tr:nth-child(2n) { background: #fafbfc; }
   hr { border: 0; border-top: 1px solid var(--border); margin: 1.6em 0; }
   img { max-width: 100%; height: auto; }
+  [data-source-line].md-sync-highlight {
+    background: var(--sync-highlight);
+    box-shadow: -3px 0 0 0 var(--sync-highlight-border);
+    border-radius: 2px;
+    transition: background 120ms ease-out;
+  }
   @media print {
     body { padding: 24px 0; max-width: none; }
+    [data-source-line].md-sync-highlight { background: transparent; box-shadow: none; }
   }
 </style>
 </head>
@@ -89,5 +98,129 @@
 <article>
 {{CONTENT}}
 </article>
+<script>
+(function () {
+  var suppressScrollSend = 0;
+  var lastSentScrollLine = -1;
+  var scrollSendTimer = null;
+  var selectionSendTimer = null;
+
+  function postMessage(obj) {
+    try {
+      if (window.chrome && window.chrome.webview && window.chrome.webview.postMessage) {
+        window.chrome.webview.postMessage(JSON.stringify(obj));
+      }
+    } catch (e) { /* ignore */ }
+  }
+
+  function getLineElements() {
+    return Array.prototype.slice.call(document.querySelectorAll('[data-source-line]'));
+  }
+
+  function findElementByLine(line) {
+    var elements = getLineElements();
+    if (elements.length === 0) return null;
+    var best = elements[0];
+    var bestLine = parseInt(best.getAttribute('data-source-line'), 10);
+    for (var i = 0; i < elements.length; i++) {
+      var l = parseInt(elements[i].getAttribute('data-source-line'), 10);
+      if (l <= line && l > bestLine) { best = elements[i]; bestLine = l; }
+      if (l > line) break;
+    }
+    return best;
+  }
+
+  function topVisibleElement() {
+    var elements = getLineElements();
+    var topLimit = 0;
+    var best = null;
+    for (var i = 0; i < elements.length; i++) {
+      var r = elements[i].getBoundingClientRect();
+      if (r.bottom > topLimit) { best = elements[i]; break; }
+    }
+    return best;
+  }
+
+  // --------------- scroll: host -> preview ---------------
+  window.mdScrollToLine = function (line) {
+    var el = findElementByLine(line);
+    if (!el) return;
+    var elements = getLineElements();
+    var idx = elements.indexOf(el);
+    var elLine = parseInt(el.getAttribute('data-source-line'), 10);
+    var nextLine = elLine;
+    var elTop = el.getBoundingClientRect().top + window.scrollY;
+    var elBottom = elTop + el.offsetHeight;
+    if (idx + 1 < elements.length) {
+      nextLine = parseInt(elements[idx + 1].getAttribute('data-source-line'), 10);
+      elBottom = elements[idx + 1].getBoundingClientRect().top + window.scrollY;
+    }
+    var span = Math.max(1, nextLine - elLine);
+    var frac = Math.max(0, Math.min(1, (line - elLine) / span));
+    var target = elTop + (elBottom - elTop) * frac;
+    suppressScrollSend = 3;
+    window.scrollTo({ top: Math.max(0, target - 8), behavior: 'auto' });
+  };
+
+  // --------------- selection: host -> preview ---------------
+  window.mdHighlightLines = function (startLine, endLine) {
+    var prev = document.querySelectorAll('.md-sync-highlight');
+    for (var i = 0; i < prev.length; i++) prev[i].classList.remove('md-sync-highlight');
+    if (startLine == null || endLine == null || startLine < 0) return;
+    var lo = Math.min(startLine, endLine);
+    var hi = Math.max(startLine, endLine);
+    var elements = getLineElements();
+    for (var j = 0; j < elements.length; j++) {
+      var l = parseInt(elements[j].getAttribute('data-source-line'), 10);
+      if (l >= lo && l <= hi) elements[j].classList.add('md-sync-highlight');
+    }
+  };
+
+  // --------------- scroll: preview -> host ---------------
+  function sendScrollLine() {
+    if (suppressScrollSend > 0) { suppressScrollSend--; return; }
+    var el = topVisibleElement();
+    if (!el) return;
+    var line = parseInt(el.getAttribute('data-source-line'), 10);
+    if (isNaN(line) || line === lastSentScrollLine) return;
+    lastSentScrollLine = line;
+    postMessage({ type: 'scroll', line: line });
+  }
+  window.addEventListener('scroll', function () {
+    if (scrollSendTimer) clearTimeout(scrollSendTimer);
+    scrollSendTimer = setTimeout(sendScrollLine, 30);
+  }, { passive: true });
+
+  // --------------- selection: preview -> host ---------------
+  function lineOfNode(node) {
+    while (node && node !== document.body) {
+      if (node.nodeType === 1 && node.hasAttribute && node.hasAttribute('data-source-line')) {
+        var v = parseInt(node.getAttribute('data-source-line'), 10);
+        if (!isNaN(v)) return v;
+      }
+      node = node.parentNode;
+    }
+    return -1;
+  }
+  function sendSelection() {
+    var sel = window.getSelection();
+    if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
+      postMessage({ type: 'selection', startLine: -1, endLine: -1 });
+      return;
+    }
+    var range = sel.getRangeAt(0);
+    var startLine = lineOfNode(range.startContainer);
+    var endLine = lineOfNode(range.endContainer);
+    if (startLine < 0 && endLine < 0) return;
+    if (startLine < 0) startLine = endLine;
+    if (endLine < 0) endLine = startLine;
+    postMessage({ type: 'selection', startLine: startLine, endLine: endLine });
+  }
+  document.addEventListener('selectionchange', function () {
+    if (selectionSendTimer) clearTimeout(selectionSendTimer);
+    selectionSendTimer = setTimeout(sendSelection, 120);
+  });
+})();
+</script>
 </body>
 </html>

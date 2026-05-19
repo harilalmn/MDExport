@@ -12,7 +12,7 @@ internal static class PdfExporter
         if (webView.CoreWebView2 == null)
             throw new InvalidOperationException("WebView2 is not initialized.");
 
-        var html = MarkdownRenderer.RenderFullPage(markdown, title);
+        var html = MarkdownRenderer.RenderExportPage(markdown, title);
 
         var tcs = new TaskCompletionSource<bool>();
         EventHandler<CoreWebView2NavigationCompletedEventArgs>? handler = null;
