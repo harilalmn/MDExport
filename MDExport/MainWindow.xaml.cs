@@ -27,7 +27,6 @@ public partial class MainWindow : Window
     private bool _webViewReady;
     private bool _previewDocumentReady;
     private string _lastRenderedHtml = string.Empty;
-    private string? _availableUpdateUrl;
 
     private int _suppressEditorScrollEcho;
     private int _suppressEditorSelectionEcho;
@@ -228,20 +227,8 @@ public partial class MainWindow : Window
             var info = await Services.UpdateChecker.FetchLatestReleaseAsync();
             if (!info.IsNewerThan(Services.UpdateChecker.GetCurrentVersion())) return;
 
-            _availableUpdateUrl = info.HtmlUrl;
-            UpdateAvailableText.Text = $"Update available: {info.TagName}";
-            UpdateAvailableText.Visibility = Visibility.Visible;
-
-            var current = Services.UpdateChecker.GetCurrentVersion();
-            var result = MessageBox.Show(this,
-                $"A new version of MDExport is available.\n\n" +
-                $"Current version: {current}\n" +
-                $"Latest version:  {info.TagName}\n\n" +
-                $"Would you like to open the download page?",
-                "MDExport — Update available",
-                MessageBoxButton.YesNo, MessageBoxImage.Information);
-            if (result == MessageBoxResult.Yes && !string.IsNullOrEmpty(_availableUpdateUrl))
-                Services.UpdateChecker.OpenReleasePage(_availableUpdateUrl);
+            UpdateBadge.Content = $"Update available — {info.TagName}";
+            UpdateBadge.Visibility = Visibility.Visible;
         }
         catch
         {
@@ -249,10 +236,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private void UpdateAvailableText_Click(object sender, MouseButtonEventArgs e)
+    private void UpdateBadge_Click(object sender, RoutedEventArgs e)
     {
-        if (!string.IsNullOrEmpty(_availableUpdateUrl))
-            Services.UpdateChecker.OpenReleasePage(_availableUpdateUrl);
+        Services.UpdateChecker.OpenReleasePage(Services.UpdateChecker.LatestReleasePageUrl);
     }
 
     // --------------------- Editor / preview ---------------------

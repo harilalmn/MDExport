@@ -16,6 +16,9 @@ public static class UpdateChecker
 {
     public const string ReleasesRepo = "harilalmn/MDExport-Releases";
 
+    public const string LatestReleasePageUrl =
+        "https://github.com/" + ReleasesRepo + "/releases/latest";
+
     private const string LatestReleaseApi =
         "https://api.github.com/repos/" + ReleasesRepo + "/releases/latest";
 

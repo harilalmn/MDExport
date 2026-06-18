@@ -201,6 +201,72 @@
         <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
     </Style>
 
+    <!-- Update-available badge: pill with a softly pulsing accent glow -->
+    <Style TargetType="{x:Type Button}" x:Key="UpdateBadgeButton">
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Foreground" Value="White" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="{x:Type Button}">
+                    <Border x:Name="Bd"
+                            CornerRadius="12"
+                            Padding="13,5"
+                            SnapsToDevicePixels="True">
+                        <Border.Background>
+                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
+                                <GradientStop Color="#FF5B9CFF" Offset="0" />
+                                <GradientStop Color="#FF3D6FE0" Offset="1" />
+                            </LinearGradientBrush>
+                        </Border.Background>
+                        <Border.Effect>
+                            <DropShadowEffect x:Name="Glow"
+                                              Color="#FF4F8FF7"
+                                              BlurRadius="10"
+                                              ShadowDepth="0"
+                                              Opacity="0.55" />
+                        </Border.Effect>
+                        <StackPanel Orientation="Horizontal">
+                            <Ellipse Width="7" Height="7"
+                                     Fill="White"
+                                     VerticalAlignment="Center"
+                                     Margin="0,0,8,0" />
+                            <ContentPresenter VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="Loaded">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="Glow"
+                                                     Storyboard.TargetProperty="BlurRadius"
+                                                     From="6" To="22"
+                                                     Duration="0:0:1.2"
+                                                     AutoReverse="True"
+                                                     RepeatBehavior="Forever" />
+                                    <DoubleAnimation Storyboard.TargetName="Glow"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     From="0.35" To="0.9"
+                                                     Duration="0:0:1.2"
+                                                     AutoReverse="True"
+                                                     RepeatBehavior="Forever" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.92" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.82" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <!-- TextBox -->
     <Style TargetType="{x:Type TextBox}">
         <Setter Property="Background" Value="{StaticResource SurfaceAltBrush}" />
