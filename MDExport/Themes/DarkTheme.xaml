@@ -222,8 +222,7 @@
                             </LinearGradientBrush>
                         </Border.Background>
                         <Border.Effect>
-                            <DropShadowEffect x:Name="Glow"
-                                              Color="#FF4F8FF7"
+                            <DropShadowEffect Color="#FF4F8FF7"
                                               BlurRadius="10"
                                               ShadowDepth="0"
                                               Opacity="0.55" />
@@ -240,14 +239,14 @@
                         <EventTrigger RoutedEvent="Loaded">
                             <BeginStoryboard>
                                 <Storyboard>
-                                    <DoubleAnimation Storyboard.TargetName="Glow"
-                                                     Storyboard.TargetProperty="BlurRadius"
+                                    <DoubleAnimation Storyboard.TargetName="Bd"
+                                                     Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.BlurRadius)"
                                                      From="6" To="22"
                                                      Duration="0:0:1.2"
                                                      AutoReverse="True"
                                                      RepeatBehavior="Forever" />
-                                    <DoubleAnimation Storyboard.TargetName="Glow"
-                                                     Storyboard.TargetProperty="Opacity"
+                                    <DoubleAnimation Storyboard.TargetName="Bd"
+                                                     Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.Opacity)"
                                                      From="0.35" To="0.9"
                                                      Duration="0:0:1.2"
                                                      AutoReverse="True"
