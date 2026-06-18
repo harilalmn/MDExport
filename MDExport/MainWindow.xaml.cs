@@ -68,6 +68,7 @@ public partial class MainWindow : Window
         Editor.TextChanged += Editor_TextChanged;
         Editor.TextArea.TextView.ScrollOffsetChanged += EditorTextView_ScrollOffsetChanged;
         Editor.TextArea.SelectionChanged += EditorTextArea_SelectionChanged;
+        PreviewKeyDown += MainWindow_PreviewKeyDown;
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
 
@@ -259,6 +260,7 @@ public partial class MainWindow : Window
     private void Editor_TextChanged(object? sender, EventArgs e)
     {
         _isModified = true;
+        _searchDirty = true;
         UpdateTitle();
         UpdateStatus();
         _previewTimer.Stop();
