@@ -88,7 +88,11 @@
                         Visibility="Collapsed"
                         Content="Update available"
                         Click="UpdateBadge_Click"
-                        ToolTip="A new version of MDExport is available — click to download the latest release" />
+                        ToolTip="A new version of MDExport is available — click to download the latest release">
+                    <Button.Effect>
+                        <DropShadowEffect Color="#FF4F8FF7" BlurRadius="12" ShadowDepth="0" Opacity="0.6" />
+                    </Button.Effect>
+                </Button>
 
                 <!-- Action buttons -->
                 <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">

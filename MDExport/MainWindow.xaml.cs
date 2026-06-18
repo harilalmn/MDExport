@@ -8,6 +8,8 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using ICSharpCode.AvalonEdit.Snippets;
 using MDExport.Services;
@@ -229,11 +231,32 @@ public partial class MainWindow : Window
 
             UpdateBadge.Content = $"Update available — {info.TagName}";
             UpdateBadge.Visibility = Visibility.Visible;
+            StartBadgePulse();
         }
         catch
         {
             // Silent: no network, rate-limited, etc. — user can still trigger from About.
         }
+    }
+
+    // Pulse the badge's glow from code. Animating the effect object directly with
+    // BeginAnimation avoids XAML storyboard name-scope resolution, which throws in
+    // Release/BAML builds when targeting template children.
+    private void StartBadgePulse()
+    {
+        if (UpdateBadge.Effect is not DropShadowEffect glow) return;
+
+        var duration = new Duration(TimeSpan.FromSeconds(1.2));
+        glow.BeginAnimation(DropShadowEffect.BlurRadiusProperty, new DoubleAnimation(6, 22, duration)
+        {
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever
+        });
+        glow.BeginAnimation(DropShadowEffect.OpacityProperty, new DoubleAnimation(0.35, 0.9, duration)
+        {
+            AutoReverse = true,
+            RepeatBehavior = RepeatBehavior.Forever
+        });
     }
 
     private void UpdateBadge_Click(object sender, RoutedEventArgs e)

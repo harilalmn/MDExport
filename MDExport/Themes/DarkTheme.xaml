@@ -211,6 +211,9 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="{x:Type Button}">
+                    <!-- Glow/effect lives on the Button element so it can be animated
+                         from code-behind; targeting template names from a XAML
+                         storyboard trigger fails to resolve in Release/BAML builds. -->
                     <Border x:Name="Bd"
                             CornerRadius="12"
                             Padding="13,5"
@@ -221,12 +224,6 @@
                                 <GradientStop Color="#FF3D6FE0" Offset="1" />
                             </LinearGradientBrush>
                         </Border.Background>
-                        <Border.Effect>
-                            <DropShadowEffect Color="#FF4F8FF7"
-                                              BlurRadius="10"
-                                              ShadowDepth="0"
-                                              Opacity="0.55" />
-                        </Border.Effect>
                         <StackPanel Orientation="Horizontal">
                             <Ellipse Width="7" Height="7"
                                      Fill="White"
@@ -236,24 +233,6 @@
                         </StackPanel>
                     </Border>
                     <ControlTemplate.Triggers>
-                        <EventTrigger RoutedEvent="Loaded">
-                            <BeginStoryboard>
-                                <Storyboard>
-                                    <DoubleAnimation Storyboard.TargetName="Bd"
-                                                     Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.BlurRadius)"
-                                                     From="6" To="22"
-                                                     Duration="0:0:1.2"
-                                                     AutoReverse="True"
-                                                     RepeatBehavior="Forever" />
-                                    <DoubleAnimation Storyboard.TargetName="Bd"
-                                                     Storyboard.TargetProperty="(UIElement.Effect).(DropShadowEffect.Opacity)"
-                                                     From="0.35" To="0.9"
-                                                     Duration="0:0:1.2"
-                                                     AutoReverse="True"
-                                                     RepeatBehavior="Forever" />
-                                </Storyboard>
-                            </BeginStoryboard>
-                        </EventTrigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="Bd" Property="Opacity" Value="0.92" />
                         </Trigger>
