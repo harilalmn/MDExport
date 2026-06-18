@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>Package</OutputType>
-    <OutputName>MDExport-1.5.3-x64</OutputName>
+    <OutputName>MDExport-1.5.4-x64</OutputName>
     <Platforms>x64</Platforms>
     <Platform>x64</Platform>
     <InstallerPlatform>x64</InstallerPlatform>
