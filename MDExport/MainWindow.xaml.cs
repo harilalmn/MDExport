@@ -30,6 +30,11 @@ public partial class MainWindow : Window
     private bool _previewDocumentReady;
     private string _lastRenderedHtml = string.Empty;
 
+    // Relative image paths in the markdown are resolved against the saved file's folder.
+    // Untitled documents have no anchor, so only absolute paths resolve for them.
+    private string? DocumentDirectory =>
+        string.IsNullOrEmpty(_currentFilePath) ? null : Path.GetDirectoryName(_currentFilePath);
+
     private int _suppressEditorScrollEcho;
     private int _suppressEditorSelectionEcho;
     private int _lastSentEditorScrollLine = -1;
@@ -285,7 +290,7 @@ public partial class MainWindow : Window
     private void RenderPreviewNow()
     {
         if (!_webViewReady || Preview.CoreWebView2 == null) return;
-        var html = MarkdownRenderer.RenderFullPage(Editor.Text, GetTitle());
+        var html = MarkdownRenderer.RenderFullPage(Editor.Text, GetTitle(), DocumentDirectory);
         if (html == _lastRenderedHtml) return;
         _lastRenderedHtml = html;
         _previewDocumentReady = false;
@@ -523,7 +528,7 @@ public partial class MainWindow : Window
         if (path == null) return;
         try
         {
-            HtmlExporter.Export(Editor.Text, path, GetTitle());
+            HtmlExporter.Export(Editor.Text, path, GetTitle(), DocumentDirectory);
             ShowExportSuccess("HTML", path);
         }
         catch (Exception ex)
@@ -546,7 +551,7 @@ public partial class MainWindow : Window
         try
         {
             Cursor = Cursors.Wait;
-            await PdfExporter.ExportAsync(Preview, Editor.Text, path, GetTitle());
+            await PdfExporter.ExportAsync(Preview, Editor.Text, path, GetTitle(), DocumentDirectory);
             ShowExportSuccess("PDF", path);
         }
         catch (Exception ex)
@@ -569,7 +574,7 @@ public partial class MainWindow : Window
         if (path == null) return;
         try
         {
-            DocxExporter.Export(Editor.Text, path);
+            DocxExporter.Export(Editor.Text, path, DocumentDirectory);
             ShowExportSuccess("DOCX", path);
         }
         catch (Exception ex)

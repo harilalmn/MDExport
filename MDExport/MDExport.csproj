@@ -9,9 +9,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>MDExport</RootNamespace>
     <AssemblyName>MDExport</AssemblyName>
-    <Version>1.5.4</Version>
-    <FileVersion>1.5.4.0</FileVersion>
-    <AssemblyVersion>1.5.4.0</AssemblyVersion>
+    <Version>1.6.0</Version>
+    <FileVersion>1.6.0.0</FileVersion>
+    <AssemblyVersion>1.6.0.0</AssemblyVersion>
     <Product>MDExport</Product>
     <Company>MDExport</Company>
     <Copyright>Copyright (c) 2026</Copyright>

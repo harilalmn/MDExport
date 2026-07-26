@@ -1,12 +1,17 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Windows.Media.Imaging;
 using DocumentFormat.OpenXml;
 using DocumentFormat.OpenXml.Packaging;
 using DocumentFormat.OpenXml.Wordprocessing;
 using Markdig;
 using Markdig.Syntax;
 using Markdig.Syntax.Inlines;
+using A = DocumentFormat.OpenXml.Drawing;
+using DW = DocumentFormat.OpenXml.Drawing.Wordprocessing;
+using PIC = DocumentFormat.OpenXml.Drawing.Pictures;
 using MarkTable = Markdig.Extensions.Tables.Table;
 using MarkTableRow = Markdig.Extensions.Tables.TableRow;
 using MarkTableCell = Markdig.Extensions.Tables.TableCell;
@@ -19,7 +24,8 @@ internal static class DocxExporter
         .UseAdvancedExtensions()
         .Build();
 
-    public static void Export(string markdown, string filePath)
+    /// <param name="baseDir">Folder of the markdown document; relative image paths resolve against it.</param>
+    public static void Export(string markdown, string filePath, string? baseDir = null)
     {
         if (File.Exists(filePath)) File.Delete(filePath);
 
@@ -29,7 +35,7 @@ internal static class DocxExporter
         var mainPart = word.AddMainDocumentPart();
         mainPart.Document = new Document(new Body());
         var body = mainPart.Document.Body!;
-        var ctx = new RenderContext(mainPart);
+        var ctx = new RenderContext(mainPart, baseDir);
 
         foreach (var block in astDoc)
             RenderBlock(block, body, ctx, indent: 0, listPrefix: null);
@@ -53,8 +59,35 @@ internal static class DocxExporter
 
     private sealed class RenderContext
     {
+        private uint _nextDrawingId = 1;
+
+        // One image part per distinct file, however often the document references it.
+        private readonly Dictionary<string, string> _imageRelIds = new(StringComparer.OrdinalIgnoreCase);
+
         public MainDocumentPart MainPart { get; }
-        public RenderContext(MainDocumentPart part) => MainPart = part;
+        public string? BaseDir { get; }
+
+        public RenderContext(MainDocumentPart part, string? baseDir)
+        {
+            MainPart = part;
+            BaseDir = baseDir;
+        }
+
+        public uint NextDrawingId() => _nextDrawingId++;
+
+        public string AddImage(string path, PartTypeInfo partType)
+        {
+            if (_imageRelIds.TryGetValue(path, out var existing)) return existing;
+
+            var imagePart = MainPart.AddImagePart(partType);
+            using (var stream = File.OpenRead(path))
+                imagePart.FeedData(stream);
+
+            var relId = MainPart.GetIdOfPart(imagePart);
+            _imageRelIds[path] = relId;
+            return relId;
+        }
+
         public string? AddHyperlink(string url)
         {
             if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return null;
@@ -131,9 +164,10 @@ internal static class DocxExporter
             _ => 20
         };
         var p = new Paragraph();
+        // CT_PPrBase fixes the child order: keepNext precedes spacing, which precedes ind.
         var pp = new ParagraphProperties(
-            new SpacingBetweenLines { Before = "240", After = "120" },
-            new KeepNext()
+            new KeepNext(),
+            new SpacingBetweenLines { Before = "240", After = "120" }
         );
         if (indent > 0) pp.AppendChild(new Indentation { Left = (720 * indent).ToString() });
         p.AppendChild(pp);
@@ -208,15 +242,25 @@ internal static class DocxExporter
     {
         var docTable = new Table();
         docTable.AppendChild(new TableProperties(
+            // CT_TblBorders fixes the child order: top, left, bottom, right, insideH, insideV.
             new TableBorders(
                 new TopBorder { Val = BorderValues.Single, Size = 4U, Color = "999999" },
-                new BottomBorder { Val = BorderValues.Single, Size = 4U, Color = "999999" },
                 new LeftBorder { Val = BorderValues.Single, Size = 4U, Color = "999999" },
+                new BottomBorder { Val = BorderValues.Single, Size = 4U, Color = "999999" },
                 new RightBorder { Val = BorderValues.Single, Size = 4U, Color = "999999" },
                 new InsideHorizontalBorder { Val = BorderValues.Single, Size = 4U, Color = "CCCCCC" },
                 new InsideVerticalBorder { Val = BorderValues.Single, Size = 4U, Color = "CCCCCC" }
             )
         ));
+
+        // CT_Tbl requires a tblGrid between the properties and the rows, one gridCol per column.
+        var columnCount = table.OfType<MarkTableRow>()
+            .Select(r => r.OfType<MarkTableCell>().Count())
+            .DefaultIfEmpty(0)
+            .Max();
+        var grid = new TableGrid();
+        for (int i = 0; i < columnCount; i++) grid.AppendChild(new GridColumn());
+        docTable.AppendChild(grid);
 
         foreach (var rowObj in table)
         {
@@ -264,6 +308,13 @@ internal static class DocxExporter
 
                 case CodeInline ci:
                     AddRun(parent, ci.Content, format with { Code = true }, extraSize);
+                    break;
+
+                case LinkInline image when image.IsImage:
+                    // Fall back to the alt text when the file is missing or Word cannot
+                    // display the format (SVG, WebP, AVIF).
+                    if (!TryAppendImage(image, parent, ctx))
+                        AppendInlines(image, parent, ctx, format with { Italic = true }, extraSize);
                     break;
 
                 case LinkInline link:
@@ -316,25 +367,127 @@ internal static class DocxExporter
         }
     }
 
+    // --------------------- Images ---------------------
+
+    private const long EmusPerInch = 914400L;
+    private const double MaxContentWidthInches = 6.5;   // Letter width minus the 1" margins
+
+    private static bool TryAppendImage(LinkInline image, OpenXmlElement parent, RenderContext ctx)
+    {
+        try
+        {
+            var path = ImageEmbedder.TryResolveLocalPath(image.Url, ctx.BaseDir);
+            if (path == null) return false;
+
+            var partType = ImagePartTypeFor(path);
+            if (partType == null) return false;
+
+            if (!TryMeasure(path, out var widthInches, out var heightInches)) return false;
+
+            if (widthInches > MaxContentWidthInches)
+            {
+                heightInches *= MaxContentWidthInches / widthInches;
+                widthInches = MaxContentWidthInches;
+            }
+
+            var relId = ctx.AddImage(path, partType.Value);
+
+            var name = Path.GetFileName(path);
+            var alt = image.FirstChild is LiteralInline lit ? lit.Content.ToString() : name;
+
+            parent.AppendChild(new Run(BuildDrawing(
+                relId,
+                (long)Math.Round(widthInches * EmusPerInch),
+                (long)Math.Round(heightInches * EmusPerInch),
+                ctx.NextDrawingId(),
+                name,
+                alt)));
+            return true;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
+        {
+            return false;
+        }
+    }
+
+    private static PartTypeInfo? ImagePartTypeFor(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() switch
+        {
+            ".png" => ImagePartType.Png,
+            ".jpg" or ".jpeg" or ".jfif" => ImagePartType.Jpeg,
+            ".gif" => ImagePartType.Gif,
+            ".bmp" => ImagePartType.Bmp,
+            ".tif" or ".tiff" => ImagePartType.Tiff,
+            _ => null   // SVG/WebP/AVIF: not reliably rendered by Word
+        };
+
+    private static bool TryMeasure(string path, out double widthInches, out double heightInches)
+    {
+        widthInches = heightInches = 0;
+        try
+        {
+            using var stream = File.OpenRead(path);
+            var frame = BitmapFrame.Create(stream, BitmapCreateOptions.DelayCreation, BitmapCacheOption.OnLoad);
+            if (frame.PixelWidth <= 0 || frame.PixelHeight <= 0) return false;
+
+            var dpiX = frame.DpiX > 1 ? frame.DpiX : 96.0;
+            var dpiY = frame.DpiY > 1 ? frame.DpiY : 96.0;
+            widthInches = frame.PixelWidth / dpiX;
+            heightInches = frame.PixelHeight / dpiY;
+            return widthInches > 0 && heightInches > 0;
+        }
+        catch (Exception ex) when (ex is IOException or NotSupportedException or ArgumentException or OverflowException)
+        {
+            return false;
+        }
+    }
+
+    private static Drawing BuildDrawing(string relationshipId, long cx, long cy, uint id, string name, string alt) =>
+        new(new DW.Inline(
+            new DW.Extent { Cx = cx, Cy = cy },
+            new DW.EffectExtent { LeftEdge = 0L, TopEdge = 0L, RightEdge = 0L, BottomEdge = 0L },
+            new DW.DocProperties { Id = id, Name = name, Description = alt },
+            new DW.NonVisualGraphicFrameDrawingProperties(new A.GraphicFrameLocks { NoChangeAspect = true }),
+            new A.Graphic(
+                new A.GraphicData(
+                    new PIC.Picture(
+                        new PIC.NonVisualPictureProperties(
+                            new PIC.NonVisualDrawingProperties { Id = 0U, Name = name, Description = alt },
+                            new PIC.NonVisualPictureDrawingProperties()),
+                        new PIC.BlipFill(
+                            new A.Blip { Embed = relationshipId },
+                            new A.Stretch(new A.FillRectangle())),
+                        new PIC.ShapeProperties(
+                            new A.Transform2D(
+                                new A.Offset { X = 0L, Y = 0L },
+                                new A.Extents { Cx = cx, Cy = cy }),
+                            new A.PresetGeometry(new A.AdjustValueList()) { Preset = A.ShapeTypeValues.Rectangle })))
+                { Uri = "http://schemas.openxmlformats.org/drawingml/2006/picture" }))
+        {
+            DistanceFromTop = 0U,
+            DistanceFromBottom = 0U,
+            DistanceFromLeft = 0U,
+            DistanceFromRight = 0U
+        });
+
     private static void AddRun(OpenXmlElement parent, string text, RunFormat format, int extraSize = 0)
     {
         if (string.IsNullOrEmpty(text)) return;
         var run = new Run();
         var rp = new RunProperties();
+        // CT_RPr fixes the child order: rFonts, b, i, color, sz, u, shd.
+        if (format.Code)
+            rp.Append(new RunFonts { Ascii = "Consolas", HighAnsi = "Consolas" });
         if (format.Bold) rp.Append(new Bold());
         if (format.Italic) rp.Append(new Italic());
-        if (format.Code)
-        {
-            rp.Append(new RunFonts { Ascii = "Consolas", HighAnsi = "Consolas" });
-            rp.Append(new Shading { Val = ShadingPatternValues.Clear, Color = "auto", Fill = "F0F0F0" });
-        }
         if (format.Hyperlink)
-        {
             rp.Append(new Color { Val = "0563C1" });
-            rp.Append(new Underline { Val = UnderlineValues.Single });
-        }
         if (extraSize > 0)
             rp.Append(new FontSize { Val = extraSize.ToString() });
+        if (format.Hyperlink)
+            rp.Append(new Underline { Val = UnderlineValues.Single });
+        if (format.Code)
+            rp.Append(new Shading { Val = ShadingPatternValues.Clear, Color = "auto", Fill = "F0F0F0" });
         if (rp.HasChildren) run.AppendChild(rp);
         run.AppendChild(new Text(text) { Space = SpaceProcessingModeValues.Preserve });
         parent.AppendChild(run);

@@ -12,6 +12,7 @@ Built with .NET 8 / WPF. Distributed as an MSI built with WiX 4.
   - **HTML** — self-contained styled HTML document.
   - **PDF** — via WebView2's `PrintToPdfAsync`, so the PDF matches the preview exactly.
   - **DOCX** — generated directly from the Markdig AST using the OpenXML SDK (no Word required).
+- **Local images** — `![alt](images/pic.png)` resolves relative to the saved `.md` file (absolute and `file://` paths work too). Images are embedded into the preview and into every export, so HTML/PDF/DOCX output is self-contained. Relative paths need the document saved first; unresolved or remote URLs are left as-is.
 - **Modern dark theme** for the app chrome (preview/export uses a clean light "GitHub-like" stylesheet, since that's what reads well on a printed page).
 - **WiX 4 MSI** installer with Start Menu shortcut and standard add/remove programs entry.
 
@@ -27,6 +28,7 @@ MDExport/                          # WPF app
   Assets/PreviewTemplate.html      # HTML template used for preview, HTML and PDF export
   Services/
     MarkdownRenderer.cs            # Markdig pipeline + template wrapping
+    ImageEmbedder.cs               # Resolves local image paths → inline data: URIs
     HtmlExporter.cs
     PdfExporter.cs                 # WebView2 PrintToPdfAsync
     DocxExporter.cs                # Walks Markdig AST → OpenXML

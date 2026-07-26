@@ -7,12 +7,12 @@ namespace MDExport.Services;
 
 internal static class PdfExporter
 {
-    public static async Task ExportAsync(WebView2 webView, string markdown, string filePath, string? title = null)
+    public static async Task ExportAsync(WebView2 webView, string markdown, string filePath, string? title = null, string? baseDir = null)
     {
         if (webView.CoreWebView2 == null)
             throw new InvalidOperationException("WebView2 is not initialized.");
 
-        var html = MarkdownRenderer.RenderExportPage(markdown, title);
+        var html = MarkdownRenderer.RenderExportPage(markdown, title, baseDir);
 
         var tcs = new TaskCompletionSource<bool>();
         EventHandler<CoreWebView2NavigationCompletedEventArgs>? handler = null;
