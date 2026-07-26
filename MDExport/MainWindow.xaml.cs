@@ -216,12 +216,26 @@ public partial class MainWindow : Window
             Preview.CoreWebView2.WebMessageReceived += Preview_WebMessageReceived;
             Preview.CoreWebView2.NavigationCompleted += Preview_NavigationCompleted;
             _webViewReady = true;
-            RenderPreviewNow();
         }
         catch (Exception ex)
         {
             MessageBox.Show(this, "Failed to initialize preview:\n" + ex.Message,
                 "MDExport", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+
+        // Kept out of the block above so a render failure is not reported as a WebView2
+        // startup failure — they have entirely different causes.
+        if (_webViewReady)
+        {
+            try
+            {
+                RenderPreviewNow();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, "Failed to render preview:\n" + ex.Message,
+                    "MDExport", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         _ = CheckForUpdatesSilentlyAsync();
@@ -294,7 +308,7 @@ public partial class MainWindow : Window
         if (html == _lastRenderedHtml) return;
         _lastRenderedHtml = html;
         _previewDocumentReady = false;
-        Preview.CoreWebView2.NavigateToString(html);
+        HtmlDocumentHost.NavigateToHtml(Preview.CoreWebView2, html);
     }
 
     // --------------------- Sync scroll / selection ---------------------

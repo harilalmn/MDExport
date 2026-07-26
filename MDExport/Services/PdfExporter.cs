@@ -22,7 +22,7 @@ internal static class PdfExporter
             tcs.TrySetResult(true);
         };
         webView.CoreWebView2.NavigationCompleted += handler;
-        webView.CoreWebView2.NavigateToString(html);
+        HtmlDocumentHost.NavigateToHtml(webView.CoreWebView2, html);
         await tcs.Task.ConfigureAwait(true);
 
         var settings = webView.CoreWebView2.Environment.CreatePrintSettings();

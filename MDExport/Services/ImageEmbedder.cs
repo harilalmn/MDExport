@@ -8,9 +8,9 @@ namespace MDExport.Services;
 /// <summary>
 /// Resolves local image references and inlines them into rendered HTML as data: URIs.
 ///
-/// The preview is loaded through NavigateToString, so the document origin is about:blank
-/// and neither relative paths nor file:// URLs can resolve. Exported HTML/PDF has the same
-/// problem the moment the output lands somewhere other than the markdown file's folder.
+/// The preview is served from a synthetic origin (see <see cref="HtmlDocumentHost"/>), so
+/// paths relative to the markdown file cannot resolve against it. Exported HTML/PDF has the
+/// same problem the moment the output lands somewhere other than the markdown file's folder.
 /// Embedding the bytes fixes both and makes exports self-contained.
 /// </summary>
 internal static class ImageEmbedder

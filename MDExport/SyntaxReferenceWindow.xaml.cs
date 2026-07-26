@@ -36,7 +36,7 @@ public partial class SyntaxReferenceWindow : Window
 
             var markdown = MarkdownRenderer.LoadReference();
             var html = MarkdownRenderer.RenderFullPage(markdown, "Markdown Syntax Reference");
-            Browser.CoreWebView2.NavigateToString(html);
+            Services.HtmlDocumentHost.NavigateToHtml(Browser.CoreWebView2, html);
             StatusText.Text = "Ready";
         }
         catch (Exception ex)
