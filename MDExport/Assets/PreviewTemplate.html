@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="{{HTML_CLASS}}">
 <head>
 <meta charset="utf-8">
 <title>{{TITLE}}</title>
@@ -8,12 +8,24 @@
     --fg: #24292f;
     --fg-muted: #57606a;
     --bg: #ffffff;
+    --row-alt: #fafbfc;
     --border: #d0d7de;
     --code-bg: #f6f8fa;
     --link: #0969da;
     --quote-border: #d0d7de;
     --sync-highlight: rgba(9, 105, 218, 0.10);
     --sync-highlight-border: rgba(9, 105, 218, 0.45);
+  }
+  html.preview-dark {
+    --fg: #d8d8d8;
+    --fg-muted: #a0a0a0;
+    --bg: #1e1e1e;
+    --border: #3a3a3a;
+    --code-bg: #2a2a2a;
+    --link: #7fb2ff;
+    --quote-border: #4a4a4a;
+    --row-alt: #252525;
+    --sync-highlight: rgba(127, 178, 255, 0.12);
   }
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; background: var(--bg); }
@@ -79,9 +91,10 @@
   }
   table th, table td { border: 1px solid var(--border); padding: 6px 12px; }
   table th { background: var(--code-bg); font-weight: 600; }
-  table tr:nth-child(2n) { background: #fafbfc; }
+  table tr:nth-child(2n) { background: var(--row-alt); }
   hr { border: 0; border-top: 1px solid var(--border); margin: 1.6em 0; }
   img { max-width: 100%; height: auto; }
+  li img { vertical-align: top; }
   [data-source-line].md-sync-highlight {
     background: var(--sync-highlight);
     box-shadow: -3px 0 0 0 var(--sync-highlight-border);
@@ -139,6 +152,26 @@
       if (r.bottom > topLimit) { best = elements[i]; break; }
     }
     return best;
+  }
+
+  // --------------- content: host -> preview ---------------
+  // Only blocks that changed are replaced, which keeps the scroll position and avoids
+  // re-decoding images on every keystroke.
+  function applyBody(html) {
+    var article = document.querySelector('article');
+    var template = document.createElement('template');
+    template.innerHTML = html;
+    var next = Array.prototype.slice.call(template.content.children);
+    var current = Array.prototype.slice.call(article.children);
+    for (var i = 0; i < next.length; i++) {
+      if (i >= current.length) article.appendChild(next[i]);
+      else if (!current[i].isEqualNode(next[i])) article.replaceChild(next[i], current[i]);
+    }
+    for (var j = next.length; j < current.length; j++) article.removeChild(current[j]);
+    postMessage({ type: 'updated' });
+  }
+  if (window.chrome && window.chrome.webview) {
+    window.chrome.webview.addEventListener('message', function (e) { applyBody(e.data); });
   }
 
   // --------------- scroll: host -> preview ---------------

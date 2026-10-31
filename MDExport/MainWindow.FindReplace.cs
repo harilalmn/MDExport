@@ -37,6 +37,7 @@ public partial class MainWindow
             if (e.Key == Key.F3) { FindNext(shift); e.Handled = true; }
             else if (e.Key == Key.Escape) { HideFindPanel(); e.Handled = true; }
         }
+        else if (e.Key == Key.Escape && _focusMode) { ToggleFocusMode(); e.Handled = true; }
     }
 
     private void FindMenu_Click(object sender, RoutedEventArgs e) => ShowFindPanel(false);
@@ -46,11 +47,7 @@ public partial class MainWindow
     private void ShowFindPanel(bool replaceMode)
     {
         // Find/Replace operates on the editor — make sure it is visible.
-        if (MenuToggleEditor.IsChecked != true)
-        {
-            MenuToggleEditor.IsChecked = true;
-            UpdatePaneLayout();
-        }
+        EnsureEditorVisible();
 
         FindPanel.Visibility = Visibility.Visible;
         ReplaceRow.Visibility = replaceMode ? Visibility.Visible : Visibility.Collapsed;

@@ -10,6 +10,7 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        WindowChromeHelper.RegisterForAllWindows();
 
         string? initialFile = null;
         if (e.Args.Length > 0)

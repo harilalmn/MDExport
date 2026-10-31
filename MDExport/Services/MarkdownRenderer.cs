@@ -39,15 +39,19 @@ internal static class MarkdownRenderer
         return sw.ToString();
     }
 
+    public static string RenderPreviewBody(string markdown, string? baseDir) =>
+        ImageEmbedder.InlineLocalImages(RenderBodyHtmlForPreview(markdown), baseDir);
+
     /// <param name="baseDir">
     /// Folder the markdown document lives in; local images are resolved against it and
     /// embedded as data: URIs so they render inside the about:blank preview document.
     /// </param>
-    public static string RenderFullPage(string markdown, string? title = null, string? baseDir = null)
+    public static string RenderFullPage(string markdown, string? title = null, string? baseDir = null, bool dark = false)
     {
-        var body = ImageEmbedder.InlineLocalImages(RenderBodyHtmlForPreview(markdown), baseDir);
+        var body = RenderPreviewBody(markdown, baseDir);
         var template = LoadTemplate();
         return template
+            .Replace("{{HTML_CLASS}}", dark ? "preview-dark" : string.Empty)
             .Replace("{{TITLE}}", System.Net.WebUtility.HtmlEncode(title ?? "Preview"))
             .Replace("{{CONTENT}}", body);
     }
@@ -57,6 +61,7 @@ internal static class MarkdownRenderer
         var body = ImageEmbedder.InlineLocalImages(RenderBodyHtml(markdown), baseDir);
         var template = LoadTemplate();
         return template
+            .Replace("{{HTML_CLASS}}", string.Empty)
             .Replace("{{TITLE}}", System.Net.WebUtility.HtmlEncode(title ?? "Preview"))
             .Replace("{{CONTENT}}", body);
     }

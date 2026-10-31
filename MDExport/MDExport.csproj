@@ -9,9 +9,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>MDExport</RootNamespace>
     <AssemblyName>MDExport</AssemblyName>
-    <Version>1.7.0</Version>
-    <FileVersion>1.7.0.0</FileVersion>
-    <AssemblyVersion>1.7.0.0</AssemblyVersion>
+    <Version>1.8.0</Version>
+    <FileVersion>1.8.0.0</FileVersion>
+    <AssemblyVersion>1.8.0.0</AssemblyVersion>
     <Product>MDExport</Product>
     <Company>MDExport</Company>
     <Copyright>Copyright (c) 2026</Copyright>
@@ -29,6 +29,7 @@
   <ItemGroup>
     <Resource Include="Assets\PreviewTemplate.html" />
     <Resource Include="Assets\MarkdownReference.md" />
+    <Resource Include="Assets\MarkdownDark.xshd" />
     <Resource Include="Assets\icon.png" />
     <Resource Include="Assets\icon.ico" />
   </ItemGroup>

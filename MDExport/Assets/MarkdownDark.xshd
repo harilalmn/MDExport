@@ -1,0 +1,29 @@
+<?xml version="1.0"?>
+<SyntaxDefinition name="MarkdownDark" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+  <Color name="Heading" foreground="#7FB2FF" fontWeight="bold" />
+  <Color name="Bold" foreground="#F0F0F0" fontWeight="bold" />
+  <Color name="Italic" foreground="#E0E0E0" fontStyle="italic" />
+  <Color name="Code" foreground="#CE9178" />
+  <Color name="Link" foreground="#6FC3DF" />
+  <Color name="Quote" foreground="#8FA98F" />
+  <Color name="Marker" foreground="#C586C0" />
+  <Color name="Comment" foreground="#7A7A7A" />
+
+  <RuleSet>
+    <Span color="Comment" multiline="true" begin="&lt;!--" end="--&gt;" />
+    <Span color="Code" multiline="true">
+      <Begin>^\s*(```|~~~)</Begin>
+      <End>^\s*(```|~~~)\s*$</End>
+    </Span>
+    <Rule color="Heading">^\s{0,3}\#{1,6}\s.*$</Rule>
+    <Rule color="Quote">^\s{0,3}&gt;.*$</Rule>
+    <Rule color="Marker">^\s*([-*+]|\d+[.)])(?=\s)</Rule>
+    <Rule color="Marker">^\s{0,3}((-\s*){3,}|(\*\s*){3,}|(_\s*){3,})$</Rule>
+    <Rule color="Code">`[^`\n]+`</Rule>
+    <Rule color="Link">!?\[[^\]\n]*\]\([^)\n]*\)</Rule>
+    <Rule color="Link">\bhttps?://[^\s)]+</Rule>
+    <Rule color="Bold">\*\*(?=\S).+?\*\*|__(?=\S).+?__</Rule>
+    <Rule color="Italic">(?&lt;![*\w])\*(?=[^\s*]).+?\*(?![*\w])</Rule>
+    <Rule color="Italic">(?&lt;![_\w])_(?=[^\s_]).+?_(?![_\w])</Rule>
+  </RuleSet>
+</SyntaxDefinition>

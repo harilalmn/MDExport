@@ -8,8 +8,6 @@ using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
-using System.Windows.Media.Animation;
-using System.Windows.Media.Effects;
 using System.Windows.Threading;
 using ICSharpCode.AvalonEdit.Snippets;
 using MDExport.Services;
@@ -24,6 +22,7 @@ public partial class MainWindow : Window
         new("InsertSnippet", typeof(MainWindow));
 
     private readonly DispatcherTimer _previewTimer;
+    private CoreWebView2Environment? _webViewEnvironment;
     private string? _currentFilePath;
     private bool _isModified;
     private bool _webViewReady;
@@ -42,6 +41,7 @@ public partial class MainWindow : Window
     private int _lastEditorSelEnd = -1;
     private readonly DispatcherTimer _editorScrollDebounce;
     private readonly DispatcherTimer _editorSelectionDebounce;
+    private const double WordsPerMinute = 200;
 
     private const string DefaultMarkdown =
         "# Welcome to MDExport\n\n" +
@@ -61,6 +61,8 @@ public partial class MainWindow : Window
     public MainWindow(string? initialFilePath)
     {
         InitializeComponent();
+        InitializeSession();
+        InitializeEditor();
 
         _previewTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(250) };
         _previewTimer.Tick += PreviewTimer_Tick;
@@ -82,8 +84,9 @@ public partial class MainWindow : Window
         {
             try
             {
-                Editor.Text = File.ReadAllText(initialFilePath);
+                Editor.Text = _lastDiskText = File.ReadAllText(initialFilePath);
                 _currentFilePath = initialFilePath;
+                RememberRecent(initialFilePath);
             }
             catch (Exception ex)
             {
@@ -98,8 +101,10 @@ public partial class MainWindow : Window
         }
 
         _isModified = false;
+        WatchCurrentFile();
         UpdateTitle();
         UpdateStatus();
+        RefreshOutline();
         PopulateInsertMenu();
         PopulateEditorContextMenu();
     }
@@ -183,6 +188,8 @@ public partial class MainWindow : Window
         var def = SnippetLibrary.Get(id);
         if (def == null) return;
 
+        EnsureEditorVisible();
+
         var ta = Editor.TextArea;
         var sel = ta.Selection.IsEmpty ? string.Empty : ta.Selection.GetText();
         var snippet = def.Build(sel);
@@ -204,21 +211,23 @@ public partial class MainWindow : Window
     {
         try
         {
-            var userDataFolder = Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "MDExport", "WebView2");
+            var userDataFolder = Path.Combine(AppSettings.DataFolder, "WebView2");
             Directory.CreateDirectory(userDataFolder);
-            var env = await CoreWebView2Environment.CreateAsync(null, userDataFolder).ConfigureAwait(true);
-            await Preview.EnsureCoreWebView2Async(env).ConfigureAwait(true);
+            _webViewEnvironment = await CoreWebView2Environment.CreateAsync(null, userDataFolder).ConfigureAwait(true);
+            await Preview.EnsureCoreWebView2Async(_webViewEnvironment).ConfigureAwait(true);
             Preview.CoreWebView2.Settings.AreDevToolsEnabled = false;
             // Must stay enabled for ContextMenuRequested to fire; the handler replaces the
             // native menu with the themed one.
             Preview.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
             Preview.CoreWebView2.Settings.IsStatusBarEnabled = false;
+            // Otherwise Ctrl+P, Ctrl+F and friends open browser UI when the preview has focus.
+            Preview.CoreWebView2.Settings.AreBrowserAcceleratorKeysEnabled = false;
             Preview.CoreWebView2.ContextMenuRequested += Preview_ContextMenuRequested;
             Preview.CoreWebView2.WebMessageReceived += Preview_WebMessageReceived;
             Preview.CoreWebView2.NavigationCompleted += Preview_NavigationCompleted;
             _webViewReady = true;
+            Preview.ZoomFactor = _settings.Zoom;
+            ApplyPreviewTheme();
         }
         catch (Exception ex)
         {
@@ -241,6 +250,7 @@ public partial class MainWindow : Window
             }
         }
 
+        OfferRecovery();
         _ = CheckForUpdatesSilentlyAsync();
     }
 
@@ -253,32 +263,11 @@ public partial class MainWindow : Window
 
             UpdateBadge.Content = $"Update available — {info.TagName}";
             UpdateBadge.Visibility = Visibility.Visible;
-            StartBadgePulse();
         }
         catch
         {
             // Silent: no network, rate-limited, etc. — user can still trigger from About.
         }
-    }
-
-    // Pulse the badge's glow from code. Animating the effect object directly with
-    // BeginAnimation avoids XAML storyboard name-scope resolution, which throws in
-    // Release/BAML builds when targeting template children.
-    private void StartBadgePulse()
-    {
-        if (UpdateBadge.Effect is not DropShadowEffect glow) return;
-
-        var duration = new Duration(TimeSpan.FromSeconds(1.2));
-        glow.BeginAnimation(DropShadowEffect.BlurRadiusProperty, new DoubleAnimation(6, 22, duration)
-        {
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever
-        });
-        glow.BeginAnimation(DropShadowEffect.OpacityProperty, new DoubleAnimation(0.35, 0.9, duration)
-        {
-            AutoReverse = true,
-            RepeatBehavior = RepeatBehavior.Forever
-        });
     }
 
     private void UpdateBadge_Click(object sender, RoutedEventArgs e)
@@ -296,22 +285,33 @@ public partial class MainWindow : Window
         UpdateStatus();
         _previewTimer.Stop();
         _previewTimer.Start();
+        _recoveryTimer.Stop();
+        _recoveryTimer.Start();
     }
 
     private void PreviewTimer_Tick(object? sender, EventArgs e)
     {
         _previewTimer.Stop();
         RenderPreviewNow();
+        RefreshOutline();
     }
 
     private void RenderPreviewNow()
     {
         if (!_webViewReady || Preview.CoreWebView2 == null) return;
-        var html = MarkdownRenderer.RenderFullPage(Editor.Text, GetTitle(), DocumentDirectory);
-        if (html == _lastRenderedHtml) return;
-        _lastRenderedHtml = html;
-        _previewDocumentReady = false;
-        HtmlDocumentHost.NavigateToHtml(Preview.CoreWebView2, html);
+        var body = MarkdownRenderer.RenderPreviewBody(Editor.Text, DocumentDirectory);
+        if (body == _lastRenderedHtml) return;
+        _lastRenderedHtml = body;
+
+        // Once a page is up, patch it in place so editing does not reload the document.
+        if (_previewDocumentReady)
+        {
+            Preview.CoreWebView2.PostWebMessageAsString(body);
+            return;
+        }
+
+        HtmlDocumentHost.NavigateToHtml(Preview.CoreWebView2,
+            MarkdownRenderer.RenderFullPage(Editor.Text, GetTitle(), DocumentDirectory, _settings.DarkPreview));
     }
 
     // --------------------- Sync scroll / selection ---------------------
@@ -416,6 +416,12 @@ public partial class MainWindow : Window
             {
                 SelectEditorLines(sLine, eLine);
             }
+            else if (type == "updated")
+            {
+                // Patched blocks lost their highlight.
+                _lastEditorSelStart = _lastEditorSelEnd = -2;
+                PushEditorSelectionToPreview();
+            }
         }
         catch
         {
@@ -466,10 +472,15 @@ public partial class MainWindow : Window
         if (!ConfirmDiscardChanges()) return;
         Editor.Text = string.Empty;
         _currentFilePath = null;
+        _lastDiskText = null;
+        _lastExport = null;
         _isModified = false;
+        RecoveryStore.Clear();
+        WatchCurrentFile();
         UpdateTitle();
         UpdateStatus();
         RenderPreviewNow();
+        RefreshOutline();
     }
 
     private void OpenCommand_Executed(object sender, ExecutedRoutedEventArgs e)
@@ -500,12 +511,17 @@ public partial class MainWindow : Window
     {
         try
         {
-            Editor.Text = File.ReadAllText(path);
+            Editor.Text = _lastDiskText = File.ReadAllText(path);
             _currentFilePath = path;
+            _lastExport = null;
             _isModified = false;
+            RecoveryStore.Clear();
+            WatchCurrentFile();
+            RememberRecent(path);
             UpdateTitle();
             UpdateStatus();
             RenderPreviewNow();
+            RefreshOutline();
         }
         catch (Exception ex)
         {
@@ -539,9 +555,17 @@ public partial class MainWindow : Window
     {
         try
         {
-            File.WriteAllText(path, Editor.Text);
+            var newLocation = !string.Equals(path, _currentFilePath, StringComparison.OrdinalIgnoreCase);
+            _lastDiskText = Editor.Text;
+            File.WriteAllText(path, _lastDiskText);
             _currentFilePath = path;
             _isModified = false;
+            RecoveryStore.Clear();
+            if (newLocation)
+            {
+                WatchCurrentFile();
+                RememberRecent(path);
+            }
             UpdateTitle();
             UpdateStatus();
         }
@@ -556,68 +580,6 @@ public partial class MainWindow : Window
 
     // --------------------- Export ---------------------
 
-    private void ExportHtml_Click(object sender, RoutedEventArgs e)
-    {
-        var path = PickExportPath("HTML files (*.html;*.htm)|*.html;*.htm", ".html");
-        if (path == null) return;
-        try
-        {
-            HtmlExporter.Export(Editor.Text, path, GetTitle(), DocumentDirectory);
-            ShowExportSuccess("HTML", path);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, "HTML export failed:\n" + ex.Message,
-                "MDExport", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
-    private async void ExportPdf_Click(object sender, RoutedEventArgs e)
-    {
-        if (!_webViewReady)
-        {
-            MessageBox.Show(this, "Preview is still initializing. Please try again in a moment.",
-                "MDExport", MessageBoxButton.OK, MessageBoxImage.Information);
-            return;
-        }
-        var path = PickExportPath("PDF files (*.pdf)|*.pdf", ".pdf");
-        if (path == null) return;
-        try
-        {
-            Cursor = Cursors.Wait;
-            await PdfExporter.ExportAsync(Preview, Editor.Text, path, GetTitle(), DocumentDirectory);
-            ShowExportSuccess("PDF", path);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, "PDF export failed:\n" + ex.Message,
-                "MDExport", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-        finally
-        {
-            Cursor = Cursors.Arrow;
-            // Restore live preview
-            _lastRenderedHtml = string.Empty;
-            RenderPreviewNow();
-        }
-    }
-
-    private void ExportDocx_Click(object sender, RoutedEventArgs e)
-    {
-        var path = PickExportPath("Word documents (*.docx)|*.docx", ".docx");
-        if (path == null) return;
-        try
-        {
-            DocxExporter.Export(Editor.Text, path, DocumentDirectory);
-            ShowExportSuccess("DOCX", path);
-        }
-        catch (Exception ex)
-        {
-            MessageBox.Show(this, "DOCX export failed:\n" + ex.Message,
-                "MDExport", MessageBoxButton.OK, MessageBoxImage.Error);
-        }
-    }
-
     private string? PickExportPath(string filter, string defaultExt)
     {
         var dlg = new SaveFileDialog
@@ -630,36 +592,6 @@ public partial class MainWindow : Window
                 : Path.GetFileNameWithoutExtension(_currentFilePath)) + defaultExt
         };
         return dlg.ShowDialog(this) == true ? dlg.FileName : null;
-    }
-
-    private void ShowExportSuccess(string format, string path)
-    {
-        StatusInfoText.Text = $"Exported {format}: {Path.GetFileName(path)}";
-    }
-
-    // --------------------- View ---------------------
-
-    private void TogglePreview_Click(object sender, RoutedEventArgs e) => UpdatePaneLayout();
-
-    private void ToggleEditor_Click(object sender, RoutedEventArgs e) => UpdatePaneLayout();
-
-    private void UpdatePaneLayout()
-    {
-        var editor = MenuToggleEditor.IsChecked;
-        var preview = MenuTogglePreview.IsChecked;
-
-        EditorColumn.MinWidth = editor ? 120 : 0;
-        EditorColumn.Width = editor ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
-
-        SplitterColumn.Width = editor && preview ? new GridLength(1) : new GridLength(0);
-
-        PreviewColumn.MinWidth = preview ? 120 : 0;
-        PreviewColumn.Width = preview ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
-    }
-
-    private void ToggleWordWrap_Click(object sender, RoutedEventArgs e)
-    {
-        Editor.WordWrap = MenuWordWrap.IsChecked;
     }
 
     private void About_Click(object sender, RoutedEventArgs e)
@@ -692,21 +624,28 @@ public partial class MainWindow : Window
     private bool ConfirmDiscardChanges()
     {
         if (!_isModified) return true;
-        var result = MessageBox.Show(this,
-            "You have unsaved changes. Save before continuing?",
-            "MDExport", MessageBoxButton.YesNoCancel, MessageBoxImage.Question);
-        if (result == MessageBoxResult.Cancel) return false;
-        if (result == MessageBoxResult.Yes)
+        var name = string.IsNullOrEmpty(_currentFilePath) ? "Untitled" : Path.GetFileName(_currentFilePath);
+        var result = ConfirmDialog.Show(this, $"Save changes to {name}?",
+            "Your changes will be lost if you don't save them.", "Save", "Don't Save");
+        if (result == ConfirmResult.Cancel) return false;
+        if (result == ConfirmResult.Primary)
         {
             SaveCommand_Executed(this, null!);
             return !_isModified;
         }
+        RecoveryStore.Clear();
         return true;
     }
 
     private void MainWindow_Closing(object? sender, System.ComponentModel.CancelEventArgs e)
     {
-        if (!ConfirmDiscardChanges()) e.Cancel = true;
+        if (!ConfirmDiscardChanges())
+        {
+            e.Cancel = true;
+            return;
+        }
+        SaveSession();
+        RecoveryStore.Clear();
     }
 
     private string GetTitle() =>
@@ -718,13 +657,19 @@ public partial class MainWindow : Window
         var modMark = _isModified ? " •" : string.Empty;
         Title = $"{name}{modMark} — MDExport";
         StatusFileText.Text = string.IsNullOrEmpty(_currentFilePath) ? "Untitled" : _currentFilePath;
-        StatusModifiedText.Text = _isModified ? "modified" : string.Empty;
+        DocStateText.Text = _isModified
+            ? "Unsaved changes"
+            : string.IsNullOrEmpty(_currentFilePath) ? "New document" : "Saved";
     }
 
     private void UpdateStatus()
     {
         var text = Editor.Text ?? string.Empty;
         var words = string.IsNullOrWhiteSpace(text) ? 0 : Regex.Matches(text, @"\S+").Count;
-        StatusInfoText.Text = $"{words:N0} words   {text.Length:N0} chars";
+        var minutes = Math.Max(1, (int)Math.Ceiling(words / WordsPerMinute));
+        var caret = Editor.TextArea.Caret;
+        var selected = Editor.SelectionLength > 0 ? $"{Editor.SelectionLength:N0} selected   ·   " : string.Empty;
+        StatusInfoText.Text =
+            $"{selected}Ln {caret.Line}, Col {caret.Column}   ·   {words:N0} words   ·   {minutes} min read";
     }
 }

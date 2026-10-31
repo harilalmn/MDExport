@@ -7,10 +7,16 @@ Built with .NET 8 / WPF. Distributed as an MSI built with WiX 4.
 ## Features
 
 - **Two-pane layout** — AvalonEdit on the left, WebView2 live preview on the right.
-- **Live preview** with 250 ms debounce, and a right-click menu for copying text, images and links.
+- **Write, Split and Read views** (Ctrl+P cycles them), an **outline** (Ctrl+Shift+O), **focus mode** (F11) and an optional dark preview. Exports stay light.
+- **Live preview** that updates in place, with a right-click menu for copying text, images and links.
+- **Markdown-aware editing** — syntax colouring, list continuation on Enter, a `/` menu at the start of a line, and pasting a URL over selected text to make a link.
+- **Images** — paste a screenshot or drop an image into the editor and it is saved to `./img` beside the document.
+- **Command palette** (Ctrl+Shift+P) for every command.
+- **Safety** — unsaved work is snapshotted for crash recovery, and changes made to the file outside MDExport are detected.
+- **Recent files**, remembered window layout and zoom (Ctrl+=, Ctrl+-, Ctrl+0).
 - **Export** to:
   - **HTML** — self-contained styled HTML document.
-  - **PDF** — via WebView2's `PrintToPdfAsync`, so the PDF matches the preview exactly.
+  - **PDF** — via WebView2's `PrintToPdfAsync`, with page size, orientation, margins and page numbers. Rendered off-screen, so the preview is left alone.
   - **DOCX** — generated directly from the Markdig AST using the OpenXML SDK (no Word required).
 - **Local images** — `![alt](images/pic.png)` resolves relative to the saved `.md` file (absolute and `file://` paths work too). Images are embedded into the preview and into every export, so HTML/PDF/DOCX output is self-contained. Relative paths need the document saved first; unresolved or remote URLs are left as-is.
 - **Single window for opened files** — opening a Markdown file from Explorer while MDExport is running loads it in the existing window (prompting to save unsaved changes) instead of starting a new one.
