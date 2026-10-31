@@ -101,6 +101,14 @@
     border-radius: 2px;
     transition: background 120ms ease-out;
   }
+  html.md-editing article { outline: none; min-height: 70vh; }
+  html.md-editing .md-locked {
+    outline: 1px dashed var(--border);
+    outline-offset: 3px;
+    cursor: pointer;
+  }
+  html.md-editing pre { outline: none; }
+  html.md-editing input[type="checkbox"] { pointer-events: auto; cursor: pointer; }
   @media print {
     body { padding: 24px 0; max-width: none; }
     [data-source-line].md-sync-highlight { background: transparent; box-shadow: none; }
@@ -117,6 +125,8 @@
   var lastSentScrollLine = -1;
   var scrollSendTimer = null;
   var selectionSendTimer = null;
+
+  window.mdPost = function (obj) { postMessage(obj); };
 
   function postMessage(obj) {
     try {
@@ -171,7 +181,13 @@
     postMessage({ type: 'updated' });
   }
   if (window.chrome && window.chrome.webview) {
-    window.chrome.webview.addEventListener('message', function (e) { applyBody(e.data); });
+    window.chrome.webview.addEventListener('message', function (e) {
+      var m = JSON.parse(e.data);
+      var editing = window.mdEdit && window.mdEdit.isActive();
+      if (m.kind === 'ack') { if (editing) window.mdEdit.ack(m); }
+      else if (m.kind === 'reset' && editing) window.mdEdit.reset(m.html, m.docLength);
+      else applyBody(m.html);
+    });
   }
 
   // --------------- scroll: host -> preview ---------------
@@ -236,6 +252,7 @@
     return -1;
   }
   function sendSelection() {
+    if (window.mdEdit && window.mdEdit.isActive()) return;
     var sel = window.getSelection();
     if (!sel || sel.rangeCount === 0 || sel.isCollapsed) {
       postMessage({ type: 'selection', startLine: -1, endLine: -1 });
@@ -254,6 +271,9 @@
     selectionSendTimer = setTimeout(sendSelection, 120);
   });
 })();
+</script>
+<script>
+{{EDIT_SCRIPT}}
 </script>
 </body>
 </html>

@@ -6,7 +6,7 @@ using System.Text.Json;
 
 namespace MDExport.Services;
 
-internal enum ViewMode { Write, Split, Read }
+internal enum ViewMode { Write, Split, Read, Edit }
 
 internal sealed record PdfOptions(string PageSize, bool Landscape, double MarginInches, bool PageNumbers)
 {
@@ -29,7 +29,7 @@ internal sealed class AppSettings
     public double WindowWidth { get; set; } = 1280;
     public double WindowHeight { get; set; } = 800;
     public bool WindowMaximized { get; set; }
-    public ViewMode ViewMode { get; set; } = ViewMode.Split;
+    public ViewMode ViewMode { get; set; } = ViewMode.Read;
     public bool ShowOutline { get; set; }
     public bool WordWrap { get; set; } = true;
     public bool DarkPreview { get; set; }

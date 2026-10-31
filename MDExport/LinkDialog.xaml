@@ -1,0 +1,19 @@
+<Window x:Class="MDExport.LinkDialog"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Style="{StaticResource AppWindow}"
+        Title="Insert link"
+        Width="420"
+        SizeToContent="Height"
+        ResizeMode="NoResize"
+        ShowInTaskbar="False"
+        WindowStartupLocation="CenterOwner">
+    <StackPanel Margin="20">
+        <TextBlock Text="Link address" Margin="0,0,0,6" />
+        <TextBox x:Name="UrlBox" Text="https://" AutomationProperties.Name="Link address" />
+        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,20,0,0">
+            <Button Style="{StaticResource AccentButton}" Content="Insert" IsDefault="True" Click="Insert_Click" />
+            <Button Style="{StaticResource FlatButton}" Padding="14,6" Margin="8,0,0,0" Content="Cancel" IsCancel="True" />
+        </StackPanel>
+    </StackPanel>
+</Window>

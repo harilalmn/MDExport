@@ -45,7 +45,7 @@ public partial class MainWindow : Window
 
     private const string DefaultMarkdown =
         "# Welcome to MDExport\n\n" +
-        "Start typing Markdown on the **left** and see the live preview on the **right**.\n\n" +
+        "Press **F2** to edit this page directly, or choose **Split** to work in Markdown with a live preview.\n\n" +
         "## Features\n\n" +
         "- Live preview (WebView2)\n" +
         "- Export to **HTML**, **PDF**, and **DOCX**\n" +
@@ -188,6 +188,12 @@ public partial class MainWindow : Window
         var def = SnippetLibrary.Get(id);
         if (def == null) return;
 
+        if (IsEditView && SnippetsInEditView.TryGetValue(id, out var pageCommand))
+        {
+            RunPageCommand(pageCommand.Command, pageCommand.Argument);
+            return;
+        }
+
         EnsureEditorVisible();
 
         var ta = Editor.TextArea;
@@ -306,12 +312,19 @@ public partial class MainWindow : Window
         // Once a page is up, patch it in place so editing does not reload the document.
         if (_previewDocumentReady)
         {
-            Preview.CoreWebView2.PostWebMessageAsString(body);
+            PostToPage(new { kind = IsEditView ? "reset" : "body", html = body, docLength = Editor.Document.TextLength });
             return;
         }
 
         HtmlDocumentHost.NavigateToHtml(Preview.CoreWebView2,
             MarkdownRenderer.RenderFullPage(Editor.Text, GetTitle(), DocumentDirectory, _settings.DarkPreview));
+    }
+
+    private void RenderPreviewFresh()
+    {
+        _lastRenderedHtml = string.Empty;
+        _previewDocumentReady = false;
+        RenderPreviewNow();
     }
 
     // --------------------- Sync scroll / selection ---------------------
@@ -325,6 +338,7 @@ public partial class MainWindow : Window
         _lastEditorSelEnd = -2;
         PushEditorScrollToPreview();
         PushEditorSelectionToPreview();
+        SyncEditViewToPage();
     }
 
     private void EditorTextView_ScrollOffsetChanged(object? sender, EventArgs e)
@@ -405,6 +419,18 @@ public partial class MainWindow : Window
             var root = doc.RootElement;
             if (!root.TryGetProperty("type", out var typeEl)) return;
             var type = typeEl.GetString();
+
+            if (type == "edit-drop")
+            {
+                HandleDroppedFiles(e.AdditionalObjects.OfType<CoreWebView2File>().Select(f => f.Path).ToList());
+                return;
+            }
+
+            if (type?.StartsWith("edit-", StringComparison.Ordinal) == true)
+            {
+                HandleEditMessage(type, root);
+                return;
+            }
 
             if (type == "scroll" && root.TryGetProperty("line", out var lineEl) && lineEl.TryGetInt32(out var line))
             {
@@ -530,8 +556,10 @@ public partial class MainWindow : Window
         }
     }
 
-    private void SaveCommand_Executed(object sender, ExecutedRoutedEventArgs e)
+    private async void SaveCommand_Executed(object sender, ExecutedRoutedEventArgs e)
     {
+        if (IsEditView) await FlushPageEditsAsync();
+
         if (string.IsNullOrEmpty(_currentFilePath))
             SaveAsCommand_Executed(sender, e);
         else

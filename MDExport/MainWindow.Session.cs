@@ -52,6 +52,9 @@ public partial class MainWindow
         _diskChangeTimer.Tick += DiskChangeTimer_Tick;
 
         ApplyPreviewTheme();
+
+        // Editing is only ever entered on request, so a document never opens ready to change.
+        if (_settings.ViewMode == ViewMode.Edit) _settings.ViewMode = ViewMode.Read;
         SetViewMode(_settings.ViewMode);
         SetOutlineVisible(_settings.ShowOutline);
         RebuildRecentMenu();
@@ -84,10 +87,28 @@ public partial class MainWindow
 
     // --------------------- Views ---------------------
 
+    private bool IsCodeEditorVisible => _settings.ViewMode is ViewMode.Write or ViewMode.Split;
+
+    private async void SwitchViewMode(ViewMode mode)
+    {
+        if (mode == _settings.ViewMode)
+        {
+            // Choosing the current view still has to leave it working.
+            SyncEditViewToPage();
+            if (mode == ViewMode.Edit) Preview.Focus();
+            return;
+        }
+
+        // Page edits must be in the document before the page they were made on goes away.
+        if (IsEditView) await FlushPageEditsAsync();
+        SetViewMode(mode);
+    }
+
     private void SetViewMode(ViewMode mode)
     {
+        var leavingEdit = _settings.ViewMode == ViewMode.Edit && mode != ViewMode.Edit;
         _settings.ViewMode = mode;
-        var editor = mode != ViewMode.Read;
+        var editor = mode is ViewMode.Write or ViewMode.Split;
         var preview = mode != ViewMode.Write;
 
         EditorColumn.MinWidth = editor ? 120 : 0;
@@ -103,11 +124,24 @@ public partial class MainWindow
         ViewWrite.IsChecked = MenuViewWrite.IsChecked = mode == ViewMode.Write;
         ViewSplit.IsChecked = MenuViewSplit.IsChecked = mode == ViewMode.Split;
         ViewRead.IsChecked = MenuViewRead.IsChecked = mode == ViewMode.Read;
+        ViewEdit.IsChecked = MenuViewEdit.IsChecked = mode == ViewMode.Edit;
+
+        EditBar.Visibility = mode == ViewMode.Edit ? Visibility.Visible : Visibility.Collapsed;
+        SyncEditViewToPage();
+        if (mode == ViewMode.Edit)
+        {
+            Preview.Focus();
+        }
+        else if (leavingEdit)
+        {
+            RenderPreviewFresh();
+            if (editor) Editor.Focus();
+        }
     }
 
     private void EnsureEditorVisible()
     {
-        if (_settings.ViewMode == ViewMode.Read) SetViewMode(ViewMode.Split);
+        if (!IsCodeEditorVisible) SwitchViewMode(ViewMode.Split);
     }
 
     private void SetOutlineVisible(bool visible)
@@ -200,7 +234,7 @@ public partial class MainWindow
         if (OutlineList.SelectedItem is not OutlineEntry entry) return;
         OutlineList.SelectedItem = null;
 
-        if (_settings.ViewMode != ViewMode.Read)
+        if (IsCodeEditorVisible)
         {
             Editor.ScrollToLine(entry.Line);
             Editor.TextArea.Caret.Line = entry.Line;
@@ -382,12 +416,17 @@ public partial class MainWindow
         if (!_isModified)
         {
             ReloadFromDisk(text);
+            if (IsEditView) ResetPageFromDocument();
             ShowInfo($"Reloaded {Path.GetFileName(_currentFilePath)}; it was changed outside MDExport.");
             return;
         }
 
         ShowInfo($"{Path.GetFileName(_currentFilePath)} was changed outside MDExport.",
-            ("Reload", () => ReloadFromDisk(text)),
+            ("Reload", () =>
+            {
+                ReloadFromDisk(text);
+                if (IsEditView) ResetPageFromDocument();
+            }),
             ("Keep Mine", () => { }));
     }
 

@@ -32,14 +32,17 @@ public partial class MainWindow
     {
         switch (id)
         {
-            case "view-write": SetViewMode(ViewMode.Write); break;
-            case "view-split": SetViewMode(ViewMode.Split); break;
-            case "view-read": SetViewMode(ViewMode.Read); break;
+            case "view-write": SwitchViewMode(ViewMode.Write); break;
+            case "view-split": SwitchViewMode(ViewMode.Split); break;
+            case "view-read": SwitchViewMode(ViewMode.Read); break;
+            case "view-edit": SwitchViewMode(ViewMode.Edit); break;
+            case "toggle-edit": SwitchViewMode(IsEditView ? ViewMode.Read : ViewMode.Edit); break;
             case "cycle-view":
-                SetViewMode(_settings.ViewMode switch
+                SwitchViewMode(_settings.ViewMode switch
                 {
                     ViewMode.Split => ViewMode.Write,
                     ViewMode.Write => ViewMode.Read,
+                    ViewMode.Read => ViewMode.Edit,
                     _ => ViewMode.Split
                 });
                 break;
@@ -54,9 +57,7 @@ public partial class MainWindow
                 _settings.DarkPreview = !_settings.DarkPreview;
                 MenuDarkPreview.IsChecked = _settings.DarkPreview;
                 ApplyPreviewTheme();
-                _lastRenderedHtml = string.Empty;
-                _previewDocumentReady = false; // The theme lives on the page, so reload it.
-                RenderPreviewNow();
+                RenderPreviewFresh(); // The theme lives on the page, so reload it.
                 break;
             case "zoom-in": SetZoom(_settings.Zoom + ZoomStep); break;
             case "zoom-out": SetZoom(_settings.Zoom - ZoomStep); break;
@@ -89,6 +90,7 @@ public partial class MainWindow
             Action("View: Write", null, "view-write"),
             Action("View: Split", null, "view-split"),
             Action("View: Read", null, "view-read"),
+            Action("View: Edit on Page", "F2", "toggle-edit"),
             Action("View: Toggle Outline", "Ctrl+Shift+O", "outline"),
             Action("View: Toggle Focus Mode", "F11", "focus"),
             Action("View: Toggle Word Wrap", null, "word-wrap"),
@@ -152,6 +154,8 @@ public partial class MainWindow
 
     private async Task RunExportAsync(string format, string path)
     {
+        if (IsEditView) await FlushPageEditsAsync();
+
         var name = Path.GetFileName(path);
         ShowInfo($"Exporting {name}...");
         Cursor = Cursors.Wait;
@@ -186,7 +190,7 @@ public partial class MainWindow
         {
             Cursor = null;
             ExportButton.IsEnabled = true;
-            if (_settings.ViewMode != ViewMode.Read) Editor.Focus();
+            if (IsCodeEditorVisible) Editor.Focus();
         }
     }
 

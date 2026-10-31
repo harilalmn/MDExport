@@ -7,10 +7,11 @@ Built with .NET 8 / WPF. Distributed as an MSI built with WiX 4.
 ## Features
 
 - **Two-pane layout** — AvalonEdit on the left, WebView2 live preview on the right.
-- **Write, Split and Read views** (Ctrl+P cycles them), an **outline** (Ctrl+Shift+O), **focus mode** (F11) and an optional dark preview. Exports stay light.
+- **Edit on the page** (F2) — type directly on the rendered document, with a Word-style toolbar for styles, lists, quotes, code, links, images and tables. Only the blocks you change are rewritten; the rest of the file keeps its exact text, and blocks that can't be edited safely are locked and open in the code editor instead.
+- **Write, Split, Read and Edit views** (Ctrl+P cycles them). Documents open in Read view unless you last used Write or Split, and Edit view is only entered when you ask for it., an **outline** (Ctrl+Shift+O), **focus mode** (F11) and an optional dark preview. Exports stay light.
 - **Live preview** that updates in place, with a right-click menu for copying text, images and links.
 - **Markdown-aware editing** — syntax colouring, list continuation on Enter, a `/` menu at the start of a line, and pasting a URL over selected text to make a link.
-- **Images** — paste a screenshot or drop an image into the editor and it is saved to `./img` beside the document.
+- **Images** — paste a screenshot, paste an image file copied in Explorer, or drag one in, on the page or in the code editor. It is saved to `./img` beside the document.
 - **Command palette** (Ctrl+Shift+P) for every command.
 - **Safety** — unsaved work is snapshotted for crash recovery, and changes made to the file outside MDExport are detected.
 - **Recent files**, remembered window layout and zoom (Ctrl+=, Ctrl+-, Ctrl+0).

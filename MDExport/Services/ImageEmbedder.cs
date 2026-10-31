@@ -31,7 +31,11 @@ internal static class ImageEmbedder
     /// Remote (http/https), protocol-relative and already-inlined sources are left alone,
     /// as are references that cannot be resolved — those keep their original markup.
     /// </summary>
-    public static string InlineLocalImages(string html, string? baseDir)
+    /// <param name="keepOriginalUrl">
+    /// Also records the reference as written in data-md-src, which Edit view needs in order to
+    /// write the image back as a path rather than as the whole embedded file.
+    /// </param>
+    public static string InlineLocalImages(string html, string? baseDir, bool keepOriginalUrl = false)
     {
         if (string.IsNullOrEmpty(html)) return html;
         if (html.IndexOf("<img", StringComparison.OrdinalIgnoreCase) < 0) return html;
@@ -48,7 +52,8 @@ internal static class ImageEmbedder
             var dataUri = TryGetDataUri(path);
             if (dataUri == null) return match.Value;
 
-            return match.Groups[1].Value + quote + dataUri + quote;
+            var original = keepOriginalUrl ? $" data-md-src={quote}{src}{quote}" : string.Empty;
+            return match.Groups[1].Value + quote + dataUri + quote + original;
         });
     }
 
@@ -119,6 +124,13 @@ internal static class ImageEmbedder
         }
 
         return null;
+    }
+
+    /// <summary>The embedded form of a local image URL, or null if it cannot be read.</summary>
+    public static string? TryGetDisplayUrl(string url, string? baseDir)
+    {
+        var path = TryResolveLocalPath(url, baseDir);
+        return path == null ? null : TryGetDataUri(path);
     }
 
     public static string MimeTypeFor(string path) => Path.GetExtension(path).ToLowerInvariant() switch

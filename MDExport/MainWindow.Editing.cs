@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -160,7 +161,7 @@ public partial class MainWindow
         if (e.Command != ApplicationCommands.Paste) return;
         try
         {
-            if (!Clipboard.ContainsImage()) return;
+            if (!Clipboard.ContainsImage() && ClipboardImageFiles().Count == 0) return;
         }
         catch (ExternalException)
         {
@@ -176,6 +177,14 @@ public partial class MainWindow
 
         try
         {
+            var files = ClipboardImageFiles();
+            if (files.Count > 0)
+            {
+                e.Handled = true;
+                foreach (var file in files) InsertDroppedImage(file);
+                return;
+            }
+
             if (Clipboard.ContainsImage() && !Clipboard.ContainsText())
             {
                 e.Handled = true;
@@ -200,12 +209,26 @@ public partial class MainWindow
         }
     }
 
+    /// <summary>Image files copied in Explorer, which arrive as paths rather than as image data.</summary>
+    private static List<string> ClipboardImageFiles()
+    {
+        if (!Clipboard.ContainsFileDropList()) return new List<string>();
+        return Clipboard.GetFileDropList().Cast<string>().Where(f => IsAny(f, ImageExtensions)).ToList();
+    }
+
     private void PasteImage(BitmapSource image)
     {
-        var folder = RequireImageFolder();
-        if (folder == null) return;
+        var url = SavePastedImage(image, out var name);
+        if (url != null) InsertImageReference(name, url);
+    }
 
-        var name = $"image-{DateTime.Now:yyyyMMdd-HHmmss-fff}.png";
+    /// <summary>Saves the image beside the document and returns its Markdown URL.</summary>
+    private string? SavePastedImage(BitmapSource image, out string name)
+    {
+        name = $"image-{DateTime.Now:yyyyMMdd-HHmmss-fff}.png";
+        var folder = RequireImageFolder();
+        if (folder == null) return null;
+
         try
         {
             using var file = File.Create(System.IO.Path.Combine(folder, name));
@@ -216,10 +239,10 @@ public partial class MainWindow
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             ShowInfo("Could not save the pasted image: " + ex.Message);
-            return;
+            return null;
         }
 
-        InsertImageReference(name, $"./{ImageFolder}/{name}");
+        return $"./{ImageFolder}/{name}";
     }
 
     /// <summary>The document's image folder, or null (with a prompt) if it has not been saved.</summary>
@@ -272,11 +295,10 @@ public partial class MainWindow
         e.Handled = true;
 
         var files = (string[])e.Data.GetData(DataFormats.FileDrop);
-        var document = files.FirstOrDefault(f => IsAny(f, DocumentExtensions));
-        if (document != null)
+        // The code editor cannot be asked for a position while it is hidden.
+        if (files.Any(f => IsAny(f, DocumentExtensions)) || !IsCodeEditorVisible)
         {
-            Activate();
-            if (ConfirmDiscardChanges()) LoadFile(document);
+            HandleDroppedFiles(files);
             return;
         }
 
@@ -288,33 +310,71 @@ public partial class MainWindow
             InsertDroppedImage(image);
     }
 
+    /// <summary>Files dropped on the page, or a document dropped anywhere in the window.</summary>
+    private void HandleDroppedFiles(IReadOnlyList<string> files)
+    {
+        Activate();
+
+        var document = files.FirstOrDefault(f => IsAny(f, DocumentExtensions));
+        if (document != null)
+        {
+            if (ConfirmDiscardChanges()) LoadFile(document);
+            return;
+        }
+
+        var images = files.Where(f => IsAny(f, ImageExtensions)).ToList();
+        if (images.Count == 0)
+        {
+            ShowInfo("Only images and Markdown files can be dropped here.");
+            return;
+        }
+
+        // Dropping an image says what the user wants, so Read view gives way to editing.
+        if (_settings.ViewMode == ViewMode.Read) SwitchViewMode(ViewMode.Edit);
+
+        foreach (var image in images)
+        {
+            if (IsEditView) InsertImageFileOnPage(image);
+            else InsertDroppedImage(image);
+        }
+    }
+
     private void InsertDroppedImage(string path)
     {
-        var folder = RequireImageFolder();
-        if (folder == null) return;
+        var url = ImportImage(path, out var name);
+        if (url == null) return;
 
-        var name = System.IO.Path.GetFileName(path);
+        InsertImageReference(name, url);
+        Editor.Document.Insert(Editor.CaretOffset, "\n");
+    }
+
+    /// <summary>Returns the Markdown URL for an image, copying it beside the document if needed.</summary>
+    private string? ImportImage(string path, out string name)
+    {
+        name = System.IO.Path.GetFileName(path);
+        var folder = RequireImageFolder();
+        if (folder == null) return null;
+
         var directory = DocumentDirectory!;
         if (path.StartsWith(directory + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
         {
-            var relative = System.IO.Path.GetRelativePath(directory, path).Replace('\\', '/');
-            InsertImageReference(name, "./" + relative);
-            return;
+            return "./" + System.IO.Path.GetRelativePath(directory, path).Replace('\\', '/');
         }
 
         try
         {
             // Kept next to the document so it still works if the document folder moves.
-            File.Copy(path, System.IO.Path.Combine(folder, name), overwrite: false);
-        }
-        catch (IOException) when (File.Exists(System.IO.Path.Combine(folder, name)))
-        {
-            name = $"{System.IO.Path.GetFileNameWithoutExtension(path)}-{DateTime.Now:HHmmss}{System.IO.Path.GetExtension(path)}";
+            if (File.Exists(System.IO.Path.Combine(folder, name)))
+                name = $"{System.IO.Path.GetFileNameWithoutExtension(path)}-{DateTime.Now:HHmmssfff}{System.IO.Path.GetExtension(path)}";
             File.Copy(path, System.IO.Path.Combine(folder, name));
         }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            ShowInfo($"Could not copy {name}: {ex.Message}");
+            return null;
+        }
 
-        InsertImageReference(name, $"./{ImageFolder}/{name}");
-        Editor.Document.Insert(Editor.CaretOffset, "\n");
+        return $"./{ImageFolder}/{name}";
     }
 
     // --------------------- Zoom ---------------------
