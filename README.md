@@ -7,12 +7,13 @@ Built with .NET 8 / WPF. Distributed as an MSI built with WiX 4.
 ## Features
 
 - **Two-pane layout** — AvalonEdit on the left, WebView2 live preview on the right.
-- **Live preview** with 250 ms debounce.
+- **Live preview** with 250 ms debounce, and a right-click menu for copying text, images and links.
 - **Export** to:
   - **HTML** — self-contained styled HTML document.
   - **PDF** — via WebView2's `PrintToPdfAsync`, so the PDF matches the preview exactly.
   - **DOCX** — generated directly from the Markdig AST using the OpenXML SDK (no Word required).
 - **Local images** — `![alt](images/pic.png)` resolves relative to the saved `.md` file (absolute and `file://` paths work too). Images are embedded into the preview and into every export, so HTML/PDF/DOCX output is self-contained. Relative paths need the document saved first; unresolved or remote URLs are left as-is.
+- **Single window for opened files** — opening a Markdown file from Explorer while MDExport is running loads it in the existing window (prompting to save unsaved changes) instead of starting a new one.
 - **Modern dark theme** for the app chrome (preview/export uses a clean light "GitHub-like" stylesheet, since that's what reads well on a printed page).
 - **WiX 4 MSI** installer with Start Menu shortcut and standard add/remove programs entry.
 

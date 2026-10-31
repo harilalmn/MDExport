@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Windows;
+using MDExport.Services;
 
 namespace MDExport;
 
@@ -18,7 +19,23 @@ public partial class App : Application
                 initialFile = Path.GetFullPath(candidate);
         }
 
+        var forwarded = false;
+        SingleInstance.RunExclusive(() =>
+        {
+            forwarded = initialFile != null && SingleInstance.TryForward(initialFile);
+            if (!forwarded) SingleInstance.Listen(OpenForwardedFile);
+        });
+
+        if (forwarded)
+        {
+            Shutdown();
+            return;
+        }
+
         var window = new MainWindow(initialFile);
         window.Show();
     }
+
+    private void OpenForwardedFile(string path) =>
+        Dispatcher.BeginInvoke(() => (MainWindow as MainWindow)?.OpenFromOtherInstance(path));
 }

@@ -35,6 +35,10 @@ internal static class HtmlDocumentHost
 
     private static readonly ConditionalWeakTable<CoreWebView2, Hosted> Documents = new();
 
+    /// <summary>True when <paramref name="uri"/> points at the synthetic preview origin.</summary>
+    public static bool IsHostedUri(Uri uri) =>
+        string.Equals(uri.GetLeftPart(UriPartial.Authority), Origin, StringComparison.OrdinalIgnoreCase);
+
     /// <summary>Replaces the WebView's current document with <paramref name="html"/>.</summary>
     public static void NavigateToHtml(CoreWebView2 core, string html)
     {

@@ -211,8 +211,11 @@ public partial class MainWindow : Window
             var env = await CoreWebView2Environment.CreateAsync(null, userDataFolder).ConfigureAwait(true);
             await Preview.EnsureCoreWebView2Async(env).ConfigureAwait(true);
             Preview.CoreWebView2.Settings.AreDevToolsEnabled = false;
-            Preview.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
+            // Must stay enabled for ContextMenuRequested to fire; the handler replaces the
+            // native menu with the themed one.
+            Preview.CoreWebView2.Settings.AreDefaultContextMenusEnabled = true;
             Preview.CoreWebView2.Settings.IsStatusBarEnabled = false;
+            Preview.CoreWebView2.ContextMenuRequested += Preview_ContextMenuRequested;
             Preview.CoreWebView2.WebMessageReceived += Preview_WebMessageReceived;
             Preview.CoreWebView2.NavigationCompleted += Preview_NavigationCompleted;
             _webViewReady = true;
@@ -478,10 +481,27 @@ public partial class MainWindow : Window
             Title = "Open Markdown file"
         };
         if (dlg.ShowDialog(this) != true) return;
+        LoadFile(dlg.FileName);
+    }
+
+    /// <summary>Opens a file handed over by a second launch of the app, in this window.</summary>
+    public void OpenFromOtherInstance(string path)
+    {
+        if (WindowState == WindowState.Minimized) SystemCommands.RestoreWindow(this);
+        Activate();
+
+        // Reloading the open document would only risk the user's unsaved edits.
+        if (string.Equals(path, _currentFilePath, StringComparison.OrdinalIgnoreCase)) return;
+
+        if (ConfirmDiscardChanges()) LoadFile(path);
+    }
+
+    private void LoadFile(string path)
+    {
         try
         {
-            Editor.Text = File.ReadAllText(dlg.FileName);
-            _currentFilePath = dlg.FileName;
+            Editor.Text = File.ReadAllText(path);
+            _currentFilePath = path;
             _isModified = false;
             UpdateTitle();
             UpdateStatus();
