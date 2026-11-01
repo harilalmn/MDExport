@@ -15,6 +15,7 @@ Built with .NET 8 / WPF. Distributed as an MSI built with WiX 4.
 - **Command palette** (Ctrl+Shift+P) for every command.
 - **Safety** — unsaved work is snapshotted for crash recovery, and changes made to the file outside MDExport are detected.
 - **Recent files**, remembered window layout and zoom (Ctrl+=, Ctrl+-, Ctrl+0).
+- **Reopen last document** on startup, switched on from the checkbox in the status bar.
 - **Export** to:
   - **HTML** — self-contained styled HTML document.
   - **PDF** — via WebView2's `PrintToPdfAsync`, with page size, orientation, margins and page numbers. Rendered off-screen, so the preview is left alone.

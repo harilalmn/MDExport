@@ -33,6 +33,7 @@ internal sealed class AppSettings
     public bool ShowOutline { get; set; }
     public bool WordWrap { get; set; } = true;
     public bool DarkPreview { get; set; }
+    public bool ReopenLastDocument { get; set; }
     public double Zoom { get; set; } = 1.0;
     public PdfOptions Pdf { get; set; } = PdfOptions.Default;
     public List<string> RecentFiles { get; set; } = new();

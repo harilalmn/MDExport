@@ -45,6 +45,7 @@ public partial class MainWindow
         Editor.WordWrap = _settings.WordWrap;
         MenuWordWrap.IsChecked = _settings.WordWrap;
         MenuDarkPreview.IsChecked = _settings.DarkPreview;
+        ReopenLastBox.IsChecked = _settings.ReopenLastDocument;
         Editor.FontSize = BaseEditorFontSize * _settings.Zoom;
 
         _recoveryTimer.Tick += RecoveryTimer_Tick;
@@ -324,6 +325,21 @@ public partial class MainWindow
     {
         _settings.AddRecent(path);
         RebuildRecentMenu();
+    }
+
+    private void ReopenLastBox_Click(object sender, RoutedEventArgs e) =>
+        _settings.ReopenLastDocument = ReopenLastBox.IsChecked == true;
+
+    /// <summary>The document to open when the app was started without one, if any.</summary>
+    private string? FindDocumentToReopen()
+    {
+        if (!_settings.ReopenLastDocument || _settings.RecentFiles.Count == 0) return null;
+
+        var path = _settings.RecentFiles[0];
+        if (File.Exists(path)) return path;
+
+        ShowInfo("Could not reopen your last document; it no longer exists: " + path);
+        return null;
     }
 
     // --------------------- Crash recovery ---------------------

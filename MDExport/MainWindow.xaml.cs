@@ -80,6 +80,9 @@ public partial class MainWindow : Window
         Loaded += MainWindow_Loaded;
         Closing += MainWindow_Closing;
 
+        // A file named on launch always wins over reopening the last one.
+        if (string.IsNullOrEmpty(initialFilePath)) initialFilePath = FindDocumentToReopen();
+
         if (!string.IsNullOrEmpty(initialFilePath) && File.Exists(initialFilePath))
         {
             try

@@ -284,6 +284,13 @@
             <StatusBarItem>
                 <TextBlock x:Name="StatusFileText" Text="Untitled" TextTrimming="CharacterEllipsis" />
             </StatusBarItem>
+            <StatusBarItem DockPanel.Dock="Right">
+                <CheckBox x:Name="ReopenLastBox"
+                          Content="Reopen last document"
+                          Foreground="{StaticResource TextMutedBrush}"
+                          ToolTip="Open the last document automatically when MDExport starts"
+                          Click="ReopenLastBox_Click" />
+            </StatusBarItem>
             <StatusBarItem HorizontalAlignment="Right">
                 <TextBlock x:Name="StatusInfoText" />
             </StatusBarItem>
